@@ -34,7 +34,9 @@ qsys_script.tcl
 *.sof
 *.pof
 *.qws
-# *.qpf # 주: 프로젝트 설정 파일. 팀에 따라 버전 관리에 포함하기도 함.
+*.vac
+*.bak
+*.qpf # 주: 프로젝트 설정 파일. 팀에 따라 버전 관리에 포함하기도 함.
 
 
 # # # AMD (Xilinx) Vivado # # #
