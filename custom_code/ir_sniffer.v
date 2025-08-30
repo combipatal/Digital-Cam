@@ -5,8 +5,8 @@ module ir_sniffer (
     input clk,          // 50MHz 클럭 기준
     input rst_n,
 	 input IRDA_RXD,     // IR 수신기 입력
-    output reg [31:0] captured_full_code,   // 최종 해독된 키 데이터
-    output reg new_data_valid    // 새로운 데이터가 나왔음을 알리는 신호
+    output reg [7:0] captured_code   // 최종 해독된 키 데이터
+    //output reg new_data_valid    // 새로운 데이터가 나왔음을 알리는 신호
 	 //output reg led_1,
 	 //output reg led_2
 );
@@ -27,15 +27,15 @@ module ir_sniffer (
     localparam TIME_9MS_MAX   = 20'd460000; // 9.2ms
     localparam TIME_4_5MS_MIN = 20'd220000; // 4.4ms
     localparam TIME_4_5MS_MAX = 20'd230000; // 4.6ms
-    localparam TIME_MARK_MIN  = 20'd15000;  // 540us
-    localparam TIME_MARK_MAX  = 20'd50000;  // 580us
-    localparam TIME_0_SP_MIN  = 20'd15000;  // 540us, '0'을 위한 Space
-    localparam TIME_0_SP_MAX  = 20'd50000;  // 580us
-    localparam TIME_1_SP_MIN  = 20'd60000;  // 1.66ms, '1'을 위한 Space
-    localparam TIME_1_SP_MAX  = 20'd100000;  // 1.70ms
+    localparam TIME_MARK_MIN  = 20'd15000;  // 300us
+    localparam TIME_MARK_MAX  = 20'd50000;  // 1ms
+    localparam TIME_0_SP_MIN  = 20'd15000;  // 300us, '0'을 위한 Space
+    localparam TIME_0_SP_MAX  = 20'd50000;  // 1ms
+    localparam TIME_1_SP_MIN  = 20'd60000;  // 1.2ms, '1'을 위한 Space
+    localparam TIME_1_SP_MAX  = 20'd100000;  // 2ms
     
     // IR 리모컨의 고유 주소 코드
-    localparam MY_CUSTOM_CODE = 16'h0000; // 사용하는 리모컨에 맞춰 수정
+    localparam MY_CUSTOM_CODE = 16'h6b86; // 사용하는 리모컨에 맞춰 수정
 
     // ===================================================================
     // 레지스터 선언
@@ -56,8 +56,8 @@ module ir_sniffer (
             counter <= 0;
             bit_counter <= 0;
             received_data <= 0;
-            captured_full_code <= 0;
-            new_data_valid <= 0;
+            captured_code <= 0;
+            //new_data_valid <= 0;
             ir_rxd_sync <= 1;
             ir_rxd_prev <= 1;
 				//led_1 <= 0;
@@ -158,12 +158,11 @@ module ir_sniffer (
                     // 수신된 32비트 데이터를 한번에 처리
                     // 1. Custom Code 확인
                     // 2. Key Code와 Inv Key Code 비교
-//                    if ((received_data[31:16] == MY_CUSTOM_CODE) &&
-//                        (received_data[31:24] == ~received_data[23:16])) begin
-                        
-                     captured_full_code <= received_data; 
-							new_data_valid <= 1'b1;
-                    //end
+                    if ((received_data[15:0] == MY_CUSTOM_CODE) &&
+                        (~received_data[31:24] == received_data[23:16])) begin
+                        captured_code <= received_data[23:16];
+								//new_data_valid <= 1'b1;
+                    end
                     state <= S_IDLE; // 처리 후 IDLE로 복귀
                 end
 
