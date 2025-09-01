@@ -61,6 +61,8 @@ module lcd(
    
    reg [19:0] delay_count;
    reg [19:0] delay_target_count;
+	
+	reg new_data;	// 새로운 데이터 판단
    
     // ===================================================================
     // 파라미터 정의
@@ -120,6 +122,7 @@ module lcd(
        endcase
    end
    reg [7:0]data_count;
+	reg [7:0]pre_data;
    
   always @(posedge clk or negedge rst_n) begin 
         if (!rst_n) begin 
@@ -129,10 +132,12 @@ module lcd(
             lcd_data <= 1'b0;
             delay_target_count <= 20'b0;
 				data_count = 0;
+				pre_data <= 0;
         end else begin
             
+
             state <= next_state;
-            
+				
             if(state == DELAY_WAIT) begin
                 delay_count <= delay_count + 1;
             end else begin
@@ -187,10 +192,13 @@ module lcd(
                 end
                 
                 WRITE_DATA : begin
-                    lcd_rs <= 1'b1;
-                    lcd_data <= input_data;          // 출력 데이터
-                    delay_target_count <= delay_40us;
-                    return_state <= WRITE_POS;
+					 	lcd_rs <= 1'b1;
+						if (pre_data != input_data) begin 
+							lcd_data <= input_data;          // 출력 데이터
+							pre_data <= input_data;
+							delay_target_count <= delay_40us;
+							return_state <= WRITE_POS;
+						end
                 end
                 
                 CMD_WRITE : begin 

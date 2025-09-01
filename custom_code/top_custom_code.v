@@ -2,22 +2,21 @@ module top_custom_code (
 	input clk,
 	input rst_n,
 	input IRDA_RXD,
+	//input [7:0].input_data,
+   input lcd_in_on,	
 	
 	output [6:0] seg_out_digit0,
-	output [6:0] seg_out_digit1
-//	output [6:0] seg_out_digit2,
-//	output [6:0] seg_out_digit3,
-//	output [6:0] seg_out_digit4,
-//	output [6:0] seg_out_digit5,
-//	output [6:0] seg_out_digit6,
-//	output [6:0] seg_out_digit7,
-	//output new_data_valid,
-	//output led_1,
-	//output led_2
+	output [6:0] seg_out_digit1,
 
+	 output [7:0]lcd_data,                  // lcd data
+    output lcd_en,                          // lcd enable
+    output lcd_rw,                              // lcd read/write (write = 0, read = 1)     
+    output lcd_rs,                          // Command/Data Select (Command = 0,Data = 1)
+    output lcd_out_on                          // lcd power on out 
+	
 );
 wire [7:0] captured_code;
-
+reg[7:0] input_data;
 
 ir_sniffer IR (
    .clk(clk),          // 50MHz 클럭 기준
@@ -30,7 +29,19 @@ ir_sniffer IR (
 	);
 
 
-
+lcd U2(
+    .lcd_data(lcd_data),                      // lcd data
+    .lcd_en(lcd_en),                            // lcd enable
+    .lcd_rw(lcd_rw),                              // lcd read/write (write = 0, read = 1)     
+    .lcd_rs(lcd_rs),                          // Command/Data Select (Command = 0,Data = 1)
+    .lcd_out_on(lcd_out_on),                          // lcd power on out
+    
+	 .input_data(input_data),
+    .clk(clk),    
+    .rst_n(rst_n),
+    .lcd_in_on(lcd_in_on)                             // lcd power on in (button)
+);
+	
 // IR 수신기에서 나온 32비트 캡처 데이터
 
 // 7세그먼트 각 자리에 연결될 출력 신호
@@ -79,5 +90,37 @@ seven_segment_decoder digit1_decoder (
 //    .binary_in(captured_full_code[31:28]),
 //    .seven_seg_out(seg_out_digit7)
 //);
+
+
+ always@(*) begin
+ 
+	case (captured_code)
+		
+		8'h00 : input_data <= 8'h30;
+		
+		8'h01 : input_data <= 8'h31;
+ 
+		8'h02 : input_data <= 8'h32;
+		
+		8'h03 : input_data <= 8'h33;
+		
+		8'h04 : input_data <= 8'h34;
+		
+		8'h05 : input_data <= 8'h35;
+		
+		8'h06 : input_data <= 8'h36;
+		
+		8'h07 : input_data <= 8'h37;
+		
+		8'h08 : input_data <= 8'h38;
+		
+		8'h09 : input_data <= 8'h39;
+		
+		default : input_data <= 8'h30;
+		
+	endcase
+end
+
+
 
 endmodule

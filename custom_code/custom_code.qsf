@@ -123,13 +123,28 @@ set_global_assignment -name EDA_TEST_BENCH_NAME tb_ir_sniffer -section_id eda_si
 set_global_assignment -name EDA_DESIGN_INSTANCE_NAME NA -section_id tb_ir_sniffer
 set_global_assignment -name EDA_TEST_BENCH_MODULE_NAME tb_ir_sniffer -section_id tb_ir_sniffer
 set_global_assignment -name EDA_TEST_BENCH_FILE tb_ir_sniffer.v -section_id tb_ir_sniffer
-set_global_assignment -name VERILOG_FILE seven_segment_decoder.v
-set_global_assignment -name VERILOG_FILE top_custom_code.v
-set_global_assignment -name VERILOG_FILE ir_sniffer.v
-set_global_assignment -name VERILOG_FILE tb_ir_sniffer.v
 set_global_assignment -name PARTITION_NETLIST_TYPE SOURCE -section_id Top
 set_global_assignment -name PARTITION_FITTER_PRESERVATION_LEVEL PLACEMENT_AND_ROUTING -section_id Top
 set_global_assignment -name PARTITION_COLOR 16764057 -section_id Top
 set_location_assignment PIN_F19 -to led_1
 set_location_assignment PIN_E19 -to led_2
+set_global_assignment -name VERILOG_FILE lcd.v
+set_global_assignment -name VERILOG_FILE seven_segment_decoder.v
+set_global_assignment -name VERILOG_FILE top_custom_code.v
+set_global_assignment -name VERILOG_FILE ir_sniffer.v
+set_global_assignment -name VERILOG_FILE tb_ir_sniffer.v
+set_global_assignment -name VERILOG_FILE output_files/lcd.v
+set_location_assignment PIN_L5 -to lcd_out_on
+set_location_assignment PIN_M1 -to lcd_rw
+set_location_assignment PIN_M2 -to lcd_rs
+set_location_assignment PIN_M23 -to lcd_in_on
+set_location_assignment PIN_L4 -to lcd_en
+set_location_assignment PIN_M5 -to lcd_data[7]
+set_location_assignment PIN_M3 -to lcd_data[6]
+set_location_assignment PIN_K2 -to lcd_data[5]
+set_location_assignment PIN_K1 -to lcd_data[4]
+set_location_assignment PIN_K7 -to lcd_data[3]
+set_location_assignment PIN_L2 -to lcd_data[2]
+set_location_assignment PIN_L1 -to lcd_data[1]
+set_location_assignment PIN_L3 -to lcd_data[0]
 set_instance_assignment -name PARTITION_HIERARCHY root_partition -to | -section_id Top
