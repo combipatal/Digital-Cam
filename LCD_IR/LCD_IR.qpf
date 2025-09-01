@@ -19,13 +19,13 @@
 #
 # Quartus Prime
 # Version 24.1std.0 Build 1077 03/04/2025 SC Lite Edition
-# Date created = 15:32:23  August 28, 2025
+# Date created = 00:20:22  September 02, 2025
 #
 # -------------------------------------------------------------------------- #
 
 QUARTUS_VERSION = "24.1"
-DATE = "15:32:23  August 28, 2025"
+DATE = "00:20:22  September 02, 2025"
 
 # Revisions
 
-PROJECT_REVISION = "lcd"
+PROJECT_REVISION = "LCD_IR"

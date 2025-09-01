@@ -18,7 +18,7 @@ module top_custom_code (
 wire [7:0] captured_code;
 reg[7:0] input_data;
 
-ir_sniffer IR (
+IR_RECEVER IR (
    .clk(clk),          // 50MHz 클럭 기준
    .rst_n(rst_n),
 	.IRDA_RXD(IRDA_RXD),     // IR 수신기 입력

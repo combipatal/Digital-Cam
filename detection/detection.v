@@ -65,7 +65,6 @@ module detection(
     always @(posedge clk or negedge rst_n)begin
         if(!rst_n) begin
             state <= start; 
-            
         end else begin 
 				state <= next_state;
 					if (next_state == st4) detect_out <= 1'b1;

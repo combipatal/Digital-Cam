@@ -3,14 +3,14 @@
 module LCD_1(
 	output reg [7:0] lcd_data,                  	// lcd data
 	output reg lcd_en,                         		// lcd enable
-   output lcd_rw,                              // lcd read/write (write = 0, read = 1)     
-   output reg lcd_rs,                          // Command/Data Select (Command = 0,Data = 1)
-   output lcd_out_on,                          // lcd power
-    
-	input [7:0]input_data,								// lcd input data
-   input clk,
-   input rst_n,
-   input lcd_in_on                             // lcd power on in (button)
+	output lcd_rw,                             	 	// lcd read/write (write = 0, read = 1)     
+	output reg lcd_rs,                          	// Command/Data Select (Command = 0,Data = 1)
+	output lcd_out_on,                         	 	// lcd power
+   
+	input [7:0]input_data,							// lcd input data
+	input clk,
+	input rst_n,
+	input lcd_in_on                             // lcd power on in (button)
     );
 
 
@@ -29,7 +29,7 @@ module LCD_1(
    //커서를 원하는 위치로 이동시킵니다. 1번째 줄의 시작 주소는 0x00이고,
    //2번째 줄의 시작 주소는 0x40입니다.
 
-
+	reg [3:0] cursor_position;
 	reg [3:0] state;					// 현재 state
 	reg [3:0] return_state;			// delay 후 복귀할 state
 	
@@ -46,8 +46,8 @@ module LCD_1(
 	parameter INIT_CLEAR = 4'b0100;          // 화면 지우기
 	parameter INIT_ENTRY_MODE = 4'b0101;     // 입력 모드 설정
 	parameter WRITE_POS = 4'b0110;           // 문자쓰기 위치지정
-	//parameter WRITE_DATA_READY = 4'b0111;	// data 출력 준비
 	parameter WRITE_DATA = 4'b1000;          // 문자쓰기 문자지정
+	parameter WAIT_NEW_DATA	= 4'b1010;
 	parameter DELAY_WAIT =4'b1001;           // 지연 대기 상태
     
 	// 50MHz 기준 delay 값 
@@ -68,7 +68,8 @@ module LCD_1(
 			lcd_en <= 0;
 			count <= 0;
 			delay_target_count <= 0;
-			data_save <= 0;
+			data_save <= 8'd0;
+			cursor_position <= 0;
 		end else begin 
 			
 			case (state) 
@@ -85,73 +86,84 @@ module LCD_1(
 					delay_target_count <= delay_15ms;	// 15ms 딜레이
 					state <= DELAY_WAIT;
 					return_state <= INIT_FUN_SET;
-					lcd_rs <= 0;						//Command
+					lcd_rs <= 0;								//Command
+					lcd_en <= 1;
 				end
 				
 				INIT_FUN_SET : begin 
-					lcd_data <= 8'h38;					//기능 설정
+					lcd_data <= 8'h38;						//기능 설정
 					delay_target_count <= delay_40us;	//40us delay
 					state <= DELAY_WAIT;
+					return_state <= INIT_DISPLAY_ON;
+					lcd_rs <= 0;								//Command
+					lcd_en <= 1;
+				end
+				
+				INIT_DISPLAY_ON : begin						// 화면 켜기
+					lcd_data <= 8'h0C;
+					delay_target_count <= delay_40us;
+					state <= DELAY_WAIT;
 					return_state <= INIT_CLEAR;
-					lcd_rs <= 0;						//Command
-					lcd_en <= 1;						// falling edge를 만들어야함
+					lcd_rs <= 0;								//Command
+					lcd_en <= 1;
 				end
 				
 				INIT_CLEAR : begin 
-					lcd_data <= 8'h01;					//화면지우기
-					delay_target_count <= delay_2ms;	//2ms delay
-					state <= DELAY_WAIT;
+					lcd_data <= 8'h01;						//화면지우기
+					delay_target_count <= delay_2ms;		//2ms delay
+					state <= DELAY_WAIT;	
 					return_state <= INIT_ENTRY_MODE;
-					lcd_rs <= 0;						//Command
+					lcd_rs <= 0;								//Command
 					lcd_en <= 1;
 				end
+	
 				
 				INIT_ENTRY_MODE : begin 
-					lcd_data <= 8'h06;					//입력 모드 설정 
+					lcd_data <= 8'h06;						//입력 모드 설정 
 					delay_target_count <= delay_40us;	//40us delay
 					return_state <= WRITE_POS;
-					state <= DELAY_WAIT;	
-					lcd_rs <= 0;						//Command
+					state <= DELAY_WAIT;		
+					lcd_rs <= 0;								//Command
 					lcd_en <= 1;
-				end
+				end		
 				
 				WRITE_POS : begin 
 					lcd_data <= 8'h80;						//0x80 + 주소 ,커서 위치 지정
 					delay_target_count <= delay_40us; 	//40us delay;
 					return_state <= WRITE_DATA;
 					state <= DELAY_WAIT;
+					lcd_rs <= 0;
 					lcd_en <= 1;
+
 				end
-				
-//				WRITE_DATA_READY : begin				// data 출력전 data 정리
-//					lcd_data <= 0;
-//					lcd_rs <= 1'b1;
-//					delay_target_count <= delay_40us;
-//					state <= DELAY_WAIT;
-//					return_state <= WRITE_DATA;
-//				end
+				// valid값으로 key pad값이 들어왓을때 wait 상태에 있다가 동작하도록 수정
 				
 				WRITE_DATA : begin 
-					if (data_save != input_data)begin 
+					if (!data_save != input_data )begin 
 						lcd_data <= input_data;					// data 출력 
 						data_save <= input_data;
-						delay_target_count <= delay_2ms;	//40us delay
+						delay_target_count <= delay_40us;	//40us delay
 						state <= DELAY_WAIT;
 						return_state <= WRITE_DATA;
-						lcd_en <= 1;
 						lcd_rs <= 1;
+						lcd_en <= 1;
+					end else begin
+						state <= WRITE_DATA;
 					end
 				end
 					
 				DELAY_WAIT : begin 							// delay counter
-					lcd_en <= 0;
+				
+					lcd_en<= 0;
 					if ( count < delay_target_count ) begin 
 						count <= count + 1;
 						state <= DELAY_WAIT;
+
 					end else begin 
 						state <= return_state;
 						count <= 0;
 						delay_target_count <= 0;
+
 					end
 				end
 				
