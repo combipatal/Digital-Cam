@@ -1,9 +1,9 @@
 module IR_RECEVER (
-   input clk,                      // 50MHz 클럭 기준
-   input rst_n,
-	input IRDA_RXD,                  // IR 수신기 입력
-   output reg [7:0] captured_code   // 최종 해독된 키 데이터
-	//output reg data_valid
+    input clk,                      // 50MHz 클럭 기준
+    input rst_n,
+    input IRDA_RXD,                  // IR 수신기 입력
+    output reg [7:0] captured_code,   // 최종 해독된 키 데이터
+    output reg data_valid
 );
 
 
@@ -48,13 +48,14 @@ always @(posedge clk or negedge rst_n) begin
         received_data <= 0;
         captured_code <= 0;
         pre_data_save <= 2'b11;
-		  //data_valid <= 0;
+		data_valid <= 0;
     end else begin
         pre_data_save <= {pre_data_save[0],IRDA_RXD};
 
         case (state)
             
             IDLE        : begin
+                data_valid <= 0;
                 if(pre_data_save[1] && !pre_data_save[0]) begin
                     count <= 0;
                     state <= LEAD_MARK;
@@ -122,18 +123,13 @@ always @(posedge clk or negedge rst_n) begin
             end
 
             PROCESS_DATA: begin
-                received_data [31:16] <= save_data [15:0];  // Custom code
-                received_data [15:8] <= save_data [23:16];  // data
-                received_data [7:0] <= save_data [31:24];   // inv_data
-
-                if ( (received_data [31:16] == MY_CUSTOM_CODE) &&
-                    (received_data[15:8]== ~received_data[7:0]) ) begin
-                    captured_code <= received_data [15:8];
-						 // data_valid <= 1;
+                if ( (save_data[15:0] == MY_CUSTOM_CODE) &&
+                     (save_data[23:16] == ~save_data[31:24]) ) begin
+                    captured_code <= save_data[23:16];
+					data_valid <= 1;
                 end
                 state <= IDLE;
-					 //data_valid <= 0;
-					  bit_counter <= 0;
+			    bit_counter <= 0;
             end
 
             default: begin
