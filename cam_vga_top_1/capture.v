@@ -85,7 +85,9 @@ assign o_sof = vsync_negedge;
             STATE_IDLE: begin
                 nxt_wr         = 0;
                 nxt_pixel_half = 1;
-                NEXT_STATE = (o_sof) ? STATE_ACTIVE : STATE_IDLE;
+                // IDLE 상태는 프레임이 막 시작되었음을 의미하므로,
+                // 바로 ACTIVE 상태로 전환하여 데이터 입력을 준비합니다.
+                NEXT_STATE = STATE_ACTIVE;
             end	
 
             // camera outputting display data

@@ -192,18 +192,34 @@ module cam_vga_top (
     reg [7:0] vga_r, vga_g, vga_b;
     reg [11:0] last_valid_data = 12'h0F0; // 초기값: 녹색
     
-    // 디버그용 신호 감지
-    reg cam_vsync_detected = 0;
-    reg cam_href_detected = 0;
+    // 디버그용 신호 감지 (Clock Domain Crossing 수정)
+    // CAM_PCLK 도메인의 신호(cam_vsync_out, cam_wr)를 clk_25MHz로 동기화합니다.
+    reg cam_vsync_out_sync1, cam_vsync_out_sync2;
+    reg cam_wr_sync1, cam_wr_sync2;
     
-    // VSYNC과 HREF 감지
-    always @(posedge CLOCK_50 or negedge rstn_50m) begin
-        if (!rstn_50m) begin
-            cam_vsync_detected <= 0;
-            cam_href_detected <= 0;
+    always @(posedge clk_25MHz or negedge rstn_25m) begin
+        if (!rstn_25m) begin
+            {cam_vsync_out_sync1, cam_vsync_out_sync2} <= 2'b0;
+            {cam_wr_sync1, cam_wr_sync2} <= 2'b0;
         end else begin
-            if (CAM_VSYNC) cam_vsync_detected <= 1;
-            if (CAM_HREF) cam_href_detected <= 1;
+            cam_vsync_out_sync1 <= cam_vsync_out;
+            cam_vsync_out_sync2 <= cam_vsync_out_sync1;
+            cam_wr_sync1 <= cam_wr;
+            cam_wr_sync2 <= cam_wr_sync1;
+        end
+    end
+
+    // 동기화된 펄스를 사용하여 디버그용 sticky flag 생성
+    reg vsync_seen_debug = 0;
+    reg href_seen_debug = 0;
+
+    always @(posedge clk_25MHz or negedge rstn_25m) begin
+        if (!rstn_25m) begin
+            vsync_seen_debug <= 1'b0;
+            href_seen_debug <= 1'b0;
+        end else begin
+            if (cam_vsync_out_sync2) vsync_seen_debug <= 1'b1;
+            if (cam_wr_sync2) href_seen_debug <= 1'b1;
         end
     end
     
@@ -223,10 +239,10 @@ module cam_vga_top (
                 if (!cam_cfg_done) begin
                     // 설정 중: 빨간색
                     {vga_r, vga_g, vga_b} <= 24'hFF0000;
-                end else if (!cam_vsync_detected) begin
+                end else if (!vsync_seen_debug) begin
                     // VSYNC 없음: 주황색
                     {vga_r, vga_g, vga_b} <= 24'hFF8000;
-                end else if (!cam_href_detected) begin
+                end else if (!href_seen_debug) begin
                     // HREF 없음: 노란색  
                     {vga_r, vga_g, vga_b} <= 24'hFFFF00;
                 end else if (fifo_empty) begin

@@ -66,9 +66,10 @@ module cfg_rom
                 29: o_data <= 16'h1e_31; // MVFP: Mirror/Flip settings
                 30: o_data <= 16'h3d_c3; // COM13
                 
+                31: o_data <= 16'h15_00; // COM10: VSYNC positive, HREF positive
+                
                 // End of configuration
-                31: o_data <= 16'hFF_FF; // Special: End of ROM
-					 32: o_data <= 16'h15_00; // COM10: VSYNC negative, HREF positive
+                32: o_data <= 16'hFF_FF; // Special: End of ROM
                 default: o_data <= 16'hFF_FF;
             endcase
         end
