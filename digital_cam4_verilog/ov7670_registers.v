@@ -45,13 +45,14 @@ module ov7670_registers (
         case (address)
             8'h00: command <= 16'h1280; // COM7   Reset
             8'h01: command <= 16'h1280; // COM7   Reset
-            8'h02: command <= 16'h1204; // COM7   Size & RGB output
+            8'h02: command <= 16'h1204; // COM7   Size & RGB output (QVGA, RGB) -> OK
             8'h03: command <= 16'h1100; // CLKRC  Prescaler - Fin/(1+1)
             8'h04: command <= 16'h0C00; // COM3   Lots of stuff, enable scaling, all others off
             8'h05: command <= 16'h3E00; // COM14  PCLK scaling off
-            8'h06: command <= 16'h8C00; // RGB444 Set RGB format
+            8'h06: command <= 16'h8C00; // RGB444 Disable RGB444 control -> OK
             8'h07: command <= 16'h0400; // COM1   no CCIR601
-            8'h08: command <= 16'h4010; // COM15  Full 0-255 output, RGB 565
+            // --- [핵심 수정] ---
+            8'h08: command <= 16'h40D0; // COM15  Full 0-255 output, RGB 565 -> 0x10에서 0xD0으로 수정
             8'h09: command <= 16'h3a04; // TSLB   Set UV ordering,  do not auto-reset window
             8'h0A: command <= 16'h1438; // COM9   - AGC Celling
             8'h0B: command <= 16'h4f40; // MTX1   - colour conversion matrix

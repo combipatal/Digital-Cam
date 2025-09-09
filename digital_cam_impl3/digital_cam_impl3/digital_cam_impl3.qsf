@@ -41,12 +41,12 @@ set_global_assignment -name DEVICE EP4CE115F29C7
 set_global_assignment -name TOP_LEVEL_ENTITY digital_cam_impl3
 set_global_assignment -name ORIGINAL_QUARTUS_VERSION 13.1
 set_global_assignment -name PROJECT_CREATION_TIME_DATE "08:37:56  FEBRUARY 15, 2015"
-set_global_assignment -name LAST_QUARTUS_VERSION 13.1
+set_global_assignment -name LAST_QUARTUS_VERSION "24.1std.0 Lite Edition"
 set_global_assignment -name PROJECT_OUTPUT_DIRECTORY output_files
 set_global_assignment -name MIN_CORE_JUNCTION_TEMP 0
 set_global_assignment -name MAX_CORE_JUNCTION_TEMP 85
 set_global_assignment -name ERROR_CHECK_FREQUENCY_DIVISOR 1
-set_global_assignment -name EDA_SIMULATION_TOOL "ModelSim-Altera (VHDL)"
+set_global_assignment -name EDA_SIMULATION_TOOL "Questa Intel FPGA (VHDL)"
 set_global_assignment -name EDA_OUTPUT_DATA_FORMAT VHDL -section_id eda_simulation
 set_global_assignment -name POWER_PRESET_COOLING_SOLUTION "23 MM HEAT SINK WITH 200 LFPM AIRFLOW"
 set_global_assignment -name POWER_BOARD_THERMAL_MODEL "NONE (CONSERVATIVE)"
@@ -206,8 +206,6 @@ set_global_assignment -name VHDL_FILE RGB.vhd
 set_global_assignment -name VHDL_FILE ov7670_registers.vhd
 set_global_assignment -name VHDL_FILE ov7670_controller.vhd
 set_global_assignment -name VHDL_FILE ov7670_capture.vhd
-set_global_assignment -name VHDL_FILE my_frame_buffer_15to0.vhd
-set_global_assignment -name VHDL_FILE my_altpll.vhd
 set_global_assignment -name VHDL_FILE i2c_sender.vhd
 set_global_assignment -name VHDL_FILE frame_buffer.vhd
 set_global_assignment -name VHDL_FILE debounce.vhd

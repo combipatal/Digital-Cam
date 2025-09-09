@@ -32,7 +32,7 @@ module i2c_sender (
     input wire  [7:0]   id,
     input wire  [7:0]   reg_addr, // reg를 reg_addr로 변경 (Verilog 예약어)
     input wire  [7:0]   value
-);ㄴ
+);
 
     reg [7:0]   divider = 8'd1;
     reg [31:0]  busy_sr = 32'd0;
