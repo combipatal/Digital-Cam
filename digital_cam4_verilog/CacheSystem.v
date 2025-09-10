@@ -1,6 +1,6 @@
-// VHDL 소스 파일: ed_cache_system.vhd
-// 3x3 픽셀 윈도우를 생성하기 위한 캐시 시스템입니다.
-// 잘못된 모듈 호출(DoubleFiFOLineBuffer)을 FIFOLineBuffer 2개로 수정하고 포트 이름을 바로잡았습니다.
+// 3x3 윈도우를 생성하기 위한 캐시 시스템
+// 비디오 스트림에서 연속된 3개의 라인을 버퍼링하여
+// 소벨 필터가 3x3 픽셀 커널 연산을 수행할 수 있도록 데이터를 제공합니다.
 
 module CacheSystem #(
     parameter DATA_WIDTH  = 8,
@@ -9,13 +9,13 @@ module CacheSystem #(
     parameter COL_BITS    = 9,
     parameter NO_OF_ROWS  = 240,
     parameter NO_OF_COLS  = 320
-) (
-    input wire                  clk,
-    input wire                  fsync_in,
-    input wire                  rsync_in,
-    input wire [DATA_WIDTH-1:0] pdata_in,
-    output wire                 fsync_out,
-    output wire                 rsync_out,
+)(
+    input  clk,
+    input  fsync_in,
+    input  rsync_in,
+    input  [DATA_WIDTH-1:0] pdata_in,
+    output fsync_out,
+    output rsync_out,
     output reg [DATA_WIDTH-1:0] pdata_out1,
     output reg [DATA_WIDTH-1:0] pdata_out2,
     output reg [DATA_WIDTH-1:0] pdata_out3,
@@ -27,105 +27,106 @@ module CacheSystem #(
     output reg [DATA_WIDTH-1:0] pdata_out9
 );
 
-    // 내부 신호 선언
+    // 내부 신호
     wire [ROW_BITS-1:0] RowsCounterOut;
     wire [COL_BITS-1:0] ColsCounterOut;
     wire [DATA_WIDTH-1:0] dout1, dout2, dout3;
-    wire [DATA_WIDTH-1:0] line_buffer1_out;
     wire fsync_temp, rsync_temp;
 
-    // 픽셀 캐시 레지스터
+    // 픽셀 캐시 레지스터 (3x3 윈도우의 각 라인)
     reg [(WINDOW_SIZE*DATA_WIDTH)-1:0] cache1, cache2, cache3;
 
-    // --- 서브 모듈 인스턴스화 ---
+    // --- 모듈 인스턴스 ---
 
-    // 라인 버퍼 1: 한 라인 지연된 데이터 출력
-    FIFOLineBuffer #(
-        .DATA_WIDTH (DATA_WIDTH),
-        .NO_OF_COLS (NO_OF_COLS)
-    ) LineBuffer1 (
-        .clk       (clk),
-        .fsync     (fsync_in),
-        .rsync     (rsync_in),
-        .pdata_in  (pdata_in),
-        .pdata_out (line_buffer1_out)
+    // 2개의 라인 버퍼를 직렬로 연결하여 총 2라인 분량의 픽셀을 지연시킴
+    DoubleFiFOLineBuffer #(
+        .DATA_WIDTH(DATA_WIDTH),
+        .NO_OF_COLS(NO_OF_COLS)
+    ) DoubleLineBuffer_inst (
+        .clk(clk),
+        .fsync(fsync_in),
+        .rsync(rsync_in),
+        .pdata_in(pdata_in),
+        .pdata_out1(dout1), // 현재 픽셀 (지연 없음)
+        .pdata_out2(dout2), // 1 라인 이전 픽셀
+        .pdata_out3(dout3)  // 2 라인 이전 픽셀
     );
 
-    // 라인 버퍼 2: 두 라인 지연된 데이터 출력
-    FIFOLineBuffer #(
-        .DATA_WIDTH (DATA_WIDTH),
-        .NO_OF_COLS (NO_OF_COLS)
-    ) LineBuffer2 (
-        .clk       (clk),
-        .fsync     (fsync_in),
-        .rsync     (rsync_in),
-        .pdata_in  (line_buffer1_out), // 첫 번째 버퍼의 출력을 입력으로 받음
-        .pdata_out (dout1)              // 2라인 전 픽셀 (pdata_out1 -> dout1)
-    );
-
-    assign dout2 = line_buffer1_out; // 1라인 전 픽셀
-    assign dout3 = pdata_in;         // 현재 픽셀
-
-    // 동기화 신호 지연기
+    // 라인 버퍼의 지연에 맞춰 동기화 신호를 지연시킴
     SyncSignalsDelayer #(
-        .ROW_BITS (ROW_BITS)
-    ) Delayer (
-        .clk       (clk),
-        .fsync_in  (fsync_in),
-        .rsync_in  (rsync_in),
-        .fsync_out (fsync_temp),
-        .rsync_out (rsync_temp)
+        .ROW_BITS(ROW_BITS)
+    ) Delayer_inst (
+        .clk(clk),
+        .fsync_in(fsync_in),
+        .rsync_in(rsync_in),
+        .fsync_out(fsync_temp),
+        .rsync_out(rsync_temp)
     );
 
-    // 행/열 카운터
-    Counter #(.n(ROW_BITS)) RowsCounter (
-        .clk    (rsync_temp),
-        .en     (fsync_temp),
-        .reset  (~fsync_temp), // Active Low Reset
-        .output_val (RowsCounterOut) // <<-- ERROR FIX: Port name corrected
+    // 지연된 동기화 신호를 기준으로 행(Row)과 열(Column) 카운터 동작
+    Counter #( .N(ROW_BITS) ) RowsCounter (
+        .clk(rsync_temp),
+        .en(fsync_temp),
+        .reset(~fsync_temp), // Active Low reset
+        .output_val(RowsCounterOut)
+    );
+    Counter #( .N(COL_BITS) ) ColsCounter (
+        .clk(clk),
+        .en(rsync_temp),
+        .reset(~rsync_temp), // Active Low reset
+        .output_val(ColsCounterOut)
     );
 
-    Counter #(.n(COL_BITS)) ColsCounter (
-        .clk    (clk),
-        .en     (rsync_temp),
-        .reset  (~rsync_temp), // Active Low Reset
-        .output_val (ColsCounterOut) // <<-- ERROR FIX: Port name corrected
-    );
-
+    // 최종 출력 동기화 신호
     assign fsync_out = fsync_temp;
     assign rsync_out = rsync_temp;
 
-    // 캐시 시프트 로직
-    always @(posedge clk) begin
-        cache1 <= {cache1[(WINDOW_SIZE*DATA_WIDTH)-DATA_WIDTH-1:0], dout1};
-        cache2 <= {cache2[(WINDOW_SIZE*DATA_WIDTH)-DATA_WIDTH-1:0], dout2};
-        cache3 <= {cache3[(WINDOW_SIZE*DATA_WIDTH)-DATA_WIDTH-1:0], dout3};
-    end
+    // --- 3x3 윈도우 생성 로직 ---
 
-    // 3x3 윈도우 출력 로직
+    // 매 클럭마다 3개의 캐시 레지스터를 시프트하여 3x3 윈도우를 구성
+    always @(posedge clk) begin
+        // z7 -> z4 -> z1, z8 -> z5 -> z2, z9 -> z6 -> z3
+        cache1 <= {cache1[(WINDOW_SIZE*DATA_WIDTH)-1 -: (WINDOW_SIZE-1)*DATA_WIDTH], dout1};
+        cache2 <= {cache2[(WINDOW_SIZE*DATA_WIDTH)-1 -: (WINDOW_SIZE-1)*DATA_WIDTH], dout2};
+        cache3 <= {cache3[(WINDOW_SIZE*DATA_WIDTH)-1 -: (WINDOW_SIZE-1)*DATA_WIDTH], dout3};
+    end
+    
+    // [오류 수정] Verilog의 표준 continuous assignment 문법인 'assign'을 사용합니다.
+    // 'logic is_first_row = ...'는 SystemVerilog 문법입니다.
+    wire is_first_row = (RowsCounterOut == 0);
+    wire is_last_row  = (RowsCounterOut == NO_OF_ROWS - 1);
+    wire is_first_col = (ColsCounterOut == 2'd1); // 2클럭 지연 고려
+    wire is_last_col  = (ColsCounterOut == NO_OF_COLS - 1);
+    
+    // 현재 윈도우의 위치(가장자리/내부)에 따라 9개의 출력 픽셀 값을 결정
     always @(*) begin
         if (fsync_temp) begin
-            // 픽셀 할당 (default)
-            pdata_out1 = cache1[DATA_WIDTH-1:0];
-            pdata_out2 = cache1[2*DATA_WIDTH-1:DATA_WIDTH];
-            pdata_out3 = cache1[3*DATA_WIDTH-1:2*DATA_WIDTH];
-            pdata_out4 = cache2[DATA_WIDTH-1:0];
-            pdata_out5 = cache2[2*DATA_WIDTH-1:DATA_WIDTH];
-            pdata_out6 = cache2[3*DATA_WIDTH-1:2*DATA_WIDTH];
-            pdata_out7 = cache3[DATA_WIDTH-1:0];
-            pdata_out8 = cache3[2*DATA_WIDTH-1:DATA_WIDTH];
-            pdata_out9 = cache3[3*DATA_WIDTH-1:2*DATA_WIDTH];
+            // 윈도우의 각 위치에 해당하는 픽셀 데이터
+            // cache[7:0]   = z1, z2, z3
+            // cache[15:8]  = z4, z5, z6
+            // cache[23:16] = z7, z8, z9
+            
+            // pdata_out7, 8, 9 (가장 오래된 라인)
+            pdata_out7 = (is_first_row || is_first_col) ? 0 : cache1[DATA_WIDTH-1:0];
+            pdata_out8 = (is_first_row) ? 0 : cache1[2*DATA_WIDTH-1:DATA_WIDTH];
+            pdata_out9 = (is_first_row || is_last_col)  ? 0 : cache1[3*DATA_WIDTH-1:2*DATA_WIDTH];
 
-            // 경계 조건 처리
-            if (RowsCounterOut == 0 || RowsCounterOut == NO_OF_ROWS - 1 || ColsCounterOut == 0 || ColsCounterOut == NO_OF_COLS - 1) begin
-                 pdata_out1 = 0; pdata_out2 = 0; pdata_out3 = 0;
-                 pdata_out4 = 0; pdata_out5 = 0; pdata_out6 = 0;
-                 pdata_out7 = 0; pdata_out8 = 0; pdata_out9 = 0;
-            end
+            // pdata_out4, 5, 6 (중간 라인)
+            pdata_out4 = (is_first_col) ? 0 : cache2[DATA_WIDTH-1:0];
+            pdata_out5 = cache2[2*DATA_WIDTH-1:DATA_WIDTH]; // 항상 중앙 픽셀
+            pdata_out6 = (is_last_col)  ? 0 : cache2[3*DATA_WIDTH-1:2*DATA_WIDTH];
+
+            // pdata_out1, 2, 3 (가장 최신 라인)
+            pdata_out1 = (is_last_row || is_first_col) ? 0 : cache3[DATA_WIDTH-1:0];
+            pdata_out2 = (is_last_row) ? 0 : cache3[2*DATA_WIDTH-1:DATA_WIDTH];
+            pdata_out3 = (is_last_row || is_last_col)  ? 0 : cache3[3*DATA_WIDTH-1:2*DATA_WIDTH];
         end else begin
+            // 비디오 활성 영역이 아닐 경우 모든 출력을 0으로
             pdata_out1 = 0; pdata_out2 = 0; pdata_out3 = 0;
             pdata_out4 = 0; pdata_out5 = 0; pdata_out6 = 0;
             pdata_out7 = 0; pdata_out8 = 0; pdata_out9 = 0;
         end
     end
+
 endmodule
+

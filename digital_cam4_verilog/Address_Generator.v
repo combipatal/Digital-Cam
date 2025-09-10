@@ -1,51 +1,35 @@
-// VHDL 소스 파일: address_Generator.vhd
-// 640x480 화면 중앙에 320x240 이미지를 표시하도록 주소 생성 로직을 수정했습니다.
+// 주소 생성기 모듈
+// 비디오 프레임 버퍼의 픽셀 주소를 순차적으로 생성합니다.
 
 module Address_Generator (
-    input wire          rst_i,
-    input wire          CLK25,
-    // --- 수정/추가된 입력 포트 ---
-    input wire  [9:0]   Hcnt,       // VGA의 수평 카운터
-    input wire  [9:0]   Vcnt,       // VGA의 수직 카운터
-    output wire [16:0]  address,    // 생성된 프레임 버퍼 주소
-    output wire         enable_out  // 실제 이미지 데이터가 유효한 영역 신호
+    input rst_i,   // 리셋 입력 (액티브 하이)
+    input CLK25,   // 25 MHz 클럭
+    input enable,  // 주소 생성 인에이블
+    input vsync,   // 수직 동기화 신호
+    output [16:0] address // 생성된 17비트 주소
 );
+    // VHDL 코드의 val 신호에 해당하는 레지스터
+    reg [16:0] val = 17'd0;
 
-    // 320x240 이미지 정보
-    localparam IMAGE_WIDTH = 320;
-    localparam IMAGE_HEIGHT = 240;
+    // 생성된 주소는 val 레지스터의 값을 가집니다.
+    assign address = val;
 
-    // 640x480 화면 중앙 좌표 계산
-    localparam H_START = (640 - IMAGE_WIDTH) / 2; // (640-320)/2 = 160
-    localparam H_END   = H_START + IMAGE_WIDTH;   // 160+320 = 480
-    localparam V_START = (480 - IMAGE_HEIGHT) / 2; // (480-240)/2 = 120
-    localparam V_END   = V_START + IMAGE_HEIGHT;  // 120+240 = 360
+    // 320x240 이미지의 총 픽셀 수
+    localparam MAX_VAL = 320 * 240;
 
-    // 내부 레지스터
-    reg [16:0] addr_reg;
-    reg enable_reg;
-
+    // CLK25의 상승 엣지에서 동작하는 프로세스
     always @(posedge CLK25) begin
         if (rst_i) begin
-            addr_reg <= 0;
-            enable_reg <= 1'b0;
-        end else begin
-            // 현재 VGA 스캔 위치가 320x240 이미지 영역 내에 있는지 확인
-            if ((Hcnt >= H_START) && (Hcnt < H_END) && (Vcnt >= V_START) && (Vcnt < V_END)) begin
-                enable_reg <= 1'b1;
-                // 이미지 영역 내에서의 상대 좌표 계산
-                // Y 좌표 * 이미지 가로 길이 + X 좌표
-                addr_reg <= (Vcnt - V_START) * IMAGE_WIDTH + (Hcnt - H_START);
-            end else begin
-                // 이미지 영역 밖은 비활성화
-                enable_reg <= 1'b0;
-                addr_reg <= 0; // 주소는 0으로 유지 (Don't care)
+            val <= 17'd0;
+        // VHDL 코드에서 vsync 리셋이 우선순위가 높으므로 먼저 체크합니다.
+        end else if (vsync == 1'b0) begin
+            val <= 17'd0;
+        end else if (enable) begin
+            // 메모리 공간을 모두 스캔하지 않았다면 주소를 1 증가시킵니다.
+            if (val < MAX_VAL) begin
+                val <= val + 1;
             end
         end
     end
-    
-    assign address = addr_reg;
-    assign enable_out = enable_reg;
 
 endmodule
-

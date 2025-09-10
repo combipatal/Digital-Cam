@@ -43,25 +43,6 @@ set_global_assignment -name TOP_LEVEL_ENTITY digital_cam_impl4
 set_global_assignment -name ORIGINAL_QUARTUS_VERSION 24.1STD.0
 set_global_assignment -name PROJECT_CREATION_TIME_DATE "18:44:17  SEPTEMBER 09, 2025"
 set_global_assignment -name LAST_QUARTUS_VERSION "24.1std.0 Lite Edition"
-set_global_assignment -name VERILOG_FILE VGA.v
-set_global_assignment -name VERILOG_FILE SyncSignalsDelayer.v
-set_global_assignment -name VERILOG_FILE RGB.v
-set_global_assignment -name VERILOG_FILE ov7670_registers.v
-set_global_assignment -name VERILOG_FILE ov7670_controller.v
-set_global_assignment -name VERILOG_FILE ov7670_capture.v
-set_global_assignment -name VERILOG_FILE i2c_sender.v
-set_global_assignment -name VERILOG_FILE frame_buffer.v
-set_global_assignment -name VERILOG_FILE FIFOLineBuffer.v
-set_global_assignment -name VERILOG_FILE edge_sobel_wrapper.v
-set_global_assignment -name VERILOG_FILE edge_sobel.v
-set_global_assignment -name VERILOG_FILE do_edge_detection.v
-set_global_assignment -name VERILOG_FILE do_black_white.v
-set_global_assignment -name VERILOG_FILE digital_cam_impl4.v
-set_global_assignment -name VERILOG_FILE debounce.v
-set_global_assignment -name VERILOG_FILE Counter.v
-set_global_assignment -name VERILOG_FILE CacheSystem.v
-set_global_assignment -name VERILOG_FILE binary_divider_ver1.v
-set_global_assignment -name VERILOG_FILE Address_Generator.v
 set_global_assignment -name PROJECT_OUTPUT_DIRECTORY output_files
 set_global_assignment -name MIN_CORE_JUNCTION_TEMP 0
 set_global_assignment -name MAX_CORE_JUNCTION_TEMP 85
@@ -74,8 +55,6 @@ set_global_assignment -name EDA_GENERATE_FUNCTIONAL_NETLIST OFF -section_id eda_
 set_global_assignment -name EDA_GENERATE_FUNCTIONAL_NETLIST OFF -section_id eda_board_design_symbol
 set_global_assignment -name EDA_GENERATE_FUNCTIONAL_NETLIST OFF -section_id eda_board_design_signal_integrity
 set_global_assignment -name EDA_GENERATE_FUNCTIONAL_NETLIST OFF -section_id eda_board_design_boundary_scan
-set_global_assignment -name QIP_FILE my_altpll.qip
-set_global_assignment -name QIP_FILE my_frame_buffer_15to0.qip
 set_global_assignment -name PARTITION_NETLIST_TYPE SOURCE -section_id Top
 set_global_assignment -name PARTITION_FITTER_PRESERVATION_LEVEL PLACEMENT_AND_ROUTING -section_id Top
 set_global_assignment -name PARTITION_COLOR 16764057 -section_id Top
@@ -134,4 +113,28 @@ set_location_assignment PIN_AE16 -to ov7670_data[7]
 set_location_assignment PIN_G15 -to LED_FSM_STATE[0]
 set_location_assignment PIN_G16 -to LED_FSM_STATE[1]
 set_location_assignment PIN_H15 -to LED_FSM_STATE[2]
+set_global_assignment -name POWER_PRESET_COOLING_SOLUTION "23 MM HEAT SINK WITH 200 LFPM AIRFLOW"
+set_global_assignment -name POWER_BOARD_THERMAL_MODEL "NONE (CONSERVATIVE)"
+set_global_assignment -name VERILOG_FILE edge_sobel_pipelined.v
+set_global_assignment -name VERILOG_FILE DoubleFiFOLineBuffer.v
+set_global_assignment -name VERILOG_FILE VGA.v
+set_global_assignment -name VERILOG_FILE SyncSignalsDelayer.v
+set_global_assignment -name VERILOG_FILE RGB.v
+set_global_assignment -name VERILOG_FILE ov7670_registers.v
+set_global_assignment -name VERILOG_FILE ov7670_controller.v
+set_global_assignment -name VERILOG_FILE ov7670_capture.v
+set_global_assignment -name VERILOG_FILE i2c_sender.v
+set_global_assignment -name VERILOG_FILE frame_buffer.v
+set_global_assignment -name VERILOG_FILE FIFOLineBuffer.v
+set_global_assignment -name VERILOG_FILE edge_sobel_wrapper.v
+set_global_assignment -name VERILOG_FILE do_edge_detection.v
+set_global_assignment -name VERILOG_FILE do_black_white.v
+set_global_assignment -name VERILOG_FILE digital_cam_impl4.v
+set_global_assignment -name VERILOG_FILE debounce.v
+set_global_assignment -name VERILOG_FILE Counter.v
+set_global_assignment -name VERILOG_FILE CacheSystem.v
+set_global_assignment -name VERILOG_FILE Address_Generator.v
+set_global_assignment -name QIP_FILE my_altpll.qip
+set_global_assignment -name QIP_FILE my_frame_buffer_15to0.qip
+set_global_assignment -name QIP_FILE PLL_clk.qip
 set_instance_assignment -name PARTITION_HIERARCHY root_partition -to | -section_id Top

@@ -1,17 +1,29 @@
-// VHDL 소스 파일: binary_divider.vhd (version 1)
-// 조합 논리를 이용한 이진수 나누기 회로
+// cristinel ababei
+// 여러 이진 나누기 구현 예제입니다.
+// 인터넷에서 "수집"했습니다 :-)
+
+//-------------------------------------------------------------------------------
+// 버전 1: std_logic_vector를 unsigned로 변환하고, 직접 나눈 후,
+// 다시 std_logic_vector로 변환합니다.
+// 참고: 이것은 가장 간단한 (즉, 게으른 사람의) 해결책입니다.
+// 하지만 내부 구조에 대한 제어권이 없습니다.
+// 또한, 조합 회로이며 clk 신호를 사용하지 않습니다.
+//-------------------------------------------------------------------------------
 
 module binary_divider_ver1 #(
-    parameter size = 8
-) (
-    input wire [size-1:0]   A,
-    input wire [size-1:0]   B,
-    output wire [size-1:0]  Q,  // 몫 (Quotient)
-    output wire [size-1:0]  R   // 나머지 (Remainder)
+    parameter SIZE = 8 // 데이터 비트 폭
+)(
+    input      [SIZE-1:0] A, // 피제수 (나뉨수)
+    input      [SIZE-1:0] B, // 제수 (나누는 수)
+    output     [SIZE-1:0] Q, // 몫
+    output     [SIZE-1:0] R  // 나머지
 );
 
-    // Verilog의 내장 산술 연산자를 사용하여 나누셈 수행
-    assign Q = A / B;
-    assign R = A % B;
+    // Verilog의 '/' 및 '%' 연산자는 기본적으로 부호 없는 연산을 수행합니다.
+    // VHDL 코드와 동일하게 순수 조합 회로로 구현됩니다.
+    // 0으로 나누는 경우, 합성 툴은 일반적으로 경고를 발생시키고
+    // 결과를 0 또는 X(알 수 없음)로 처리합니다. 여기서는 VHDL의 동작을 그대로 따릅니다.
+    assign Q = (B == 0) ? {SIZE{1'b1}} : A / B;
+    assign R = (B == 0) ? A : A % B;
 
 endmodule
