@@ -17,9 +17,12 @@ module display_interface
     output reg  [18:0] o_raddr,      // 프레임 버퍼 읽기 주소 (640*480 = 307,200)
     input  wire [11:0] i_rdata,      // 프레임 버퍼로부터 읽은 픽셀 데이터
 
-    // TMDS out
-    output wire [3:0]  o_TMDS_P,     // HDMI TMDS 차동 출력 (+)
-    output wire [3:0]  o_TMDS_N      // HDMI TMDS 차동 출력 (-)
+    // VGA
+    output wire [7:0]  o_VGA_R,
+    output wire [7:0]  o_VGA_G,
+    output wire [7:0]  o_VGA_B,
+    output wire        o_VGA_HS,
+    output wire        o_VGA_VS
     );
 
 
@@ -31,6 +34,11 @@ module display_interface
     wire        vsync, hsync, active; // 수직/수평 동기화, 화면 활성 신호
     wire [9:0]  counterX, counterY;   // 현재 픽셀의 X/Y 좌표
     reg  [7:0]  red, green, blue;     // 8비트 RGB 색상 값
+    reg  [1:0]  STATE, NEXT_STATE;
+    localparam  STATE_INITIAL = 0,
+                STATE_DELAY   = 1,
+                STATE_IDLE    = 3,
+                STATE_ACTIVE  = 2;
  
     //=============================================================
     // RGB 색상 할당
@@ -64,8 +72,19 @@ module display_interface
             end
 
             STATE_DELAY: begin
-    // =============================================================
-            // 활성 상태: 프레임 버퍼에서 데이터 읽기
+                NEXT_STATE = ((counterX == 640) && (counterY == 480)) ? STATE_ACTIVE:STATE_DELAY;
+            end
+            
+            STATE_IDLE: begin
+                if((counterX == 799)&&((counterY==524)||(counterY<480))) begin
+                    nxt_raddr  = o_raddr + 1;
+                    NEXT_STATE = STATE_ACTIVE;
+                end
+                else if(counterY > 479) begin
+                    nxt_raddr = 0;
+                end
+            end
+               // 활성 상태: 프레임 버퍼에서 데이터 읽기
             STATE_ACTIVE: begin
                 // 활성 영역이고 현재 라인 내부인 경우
                 if(active && (counterX < 639)) begin
@@ -76,8 +95,6 @@ module display_interface
                     NEXT_STATE = STATE_IDLE;   // 대기 상태로 전환
                 end
             end
-
-
         endcase
     end
 
@@ -85,4 +102,35 @@ module display_interface
     always@(posedge i_p_clk) begin
         if(!i_rstn) begin
             o_raddr <= 0;
-    // =============================================================
+            STATE <= STATE_DELAY;
+        end else begin
+            o_raddr <= nxt_raddr;
+            STATE   <= NEXT_STATE;
+        end
+    end
+ // --- 기존 vtc 인스턴스 유지 ---
+    // Video Timing Controller: hsync, vsync, active 신호를 생성합니다.
+    vtc #(
+    .COUNTER_WIDTH(10)
+    )
+    vtc_i (
+    .i_clk         (i_p_clk  ),
+    .i_rstn        (i_rstn   ), 
+    .o_vsync       (vsync    ),
+    .o_hsync       (hsync    ),
+    .o_active      (active   ), // 화면에 픽셀이 표시되는 유효 영역
+    .o_counterX    (counterX ),
+    .o_counterY    (counterY )
+    );
+
+    // --- 수정된 부분: VGA 신호 할당 ---
+    assign o_VGA_HS = hsync;
+    assign o_VGA_VS = vsync;
+
+    // 'active' 기간에만 RGB 데이터를 출력하고, 그 외 (blanking 기간)에는 검은색(0)을 출력합니다.
+    // DE2-115의 DAC는 10비트이므로, 8비트 RGB 데이터를 상위 비트에 맞춰 확장합니다. (8'b_rrrr_rrrr -> 10'b_rrrr_rrrr_00)
+    assign o_VGA_R = active ? red : 8'd0;
+    assign o_VGA_G = active ? green : 8'd0;
+    assign o_VGA_B = active ? blue : 8'd0;
+    
+endmodule

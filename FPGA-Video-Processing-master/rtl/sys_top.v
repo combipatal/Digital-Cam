@@ -2,7 +2,7 @@
 //
 module sys_top 
     (
-    input  wire       i_sysclk,    // 125 MHz board clock
+    input  wire       clk_50MHz,
     input  wire       i_rst,       // active-high board button
 
     // camera interface
@@ -43,10 +43,10 @@ module sys_top
 // =============================================================
 //              Parameters, Registers, and Wires
 // =============================================================
-// DCM
+// PLL
     wire        clk_25MHz;
-    wire        clk_250MHz;
-    wire        clk_PS;
+    //wire        clk_PS;
+    wire        i_sysclk,    // 125 MHz board clock
 
 // Debounce
     wire        db_rstn;
@@ -134,14 +134,17 @@ module sys_top
     //---------------------------------------------------
     //                 Clocking Wizard:
     //---------------------------------------------------
-    clk_wiz_0 
-    dcm_i (
-        .clk_in1    (i_sysclk      ), // 125MHz board clock
-        .reset      (1'b0          ),
-        .clk_24MHz  (o_cam_xclk    ), // camera reference clock output
-        .clk_25MHz  (clk_25MHz     ), // display pixel clock
-        .clk_250MHz (clk_250MHz    ), // display TMDS clock
-        .clk_PS     (clk_PS        )  // processing system clock
+    PLL_clk 
+    pll_init (
+        .inclk0     (clk_50MHz      ), // 50MHz board clock
+        .c0         (o_cam_xclk    ), // 24MHz camera reference clock output
+        .c1         (clk_25MHz     ) // display pixel clock
+    );
+    
+    PLL_125MHz
+    pll_init_125 (
+        .inclk0     (clk_50MHz   ),
+        .c0         (i_sysclk    )   //125MHz 
     );
 
     //---------------------------------------------------
@@ -311,17 +314,19 @@ module sys_top
     display_interface 
     display_i(
     .i_p_clk       (clk_25MHz       ), // 25 MHz display clock
-    .i_tmds_clk    (clk_250MHz      ), // 250 MHz TMDS clock
-    .i_rstn        (db_rstn         ), 
+    .i_rstn        (sync_rstn_25    ), 
     .i_mode        (sys_mode        ), // mode; color or greyscale
     
     // frame buffer read interface
     .o_raddr       (framebuf_raddr  ),
     .i_rdata       (framebuf_rdata  ),
 
-    // TMDS out   
-    .o_TMDS_P      (o_TMDS_P        ), // HDMI outputs
-    .o_TMDS_N      (o_TMDS_N        )
+    //VGA
+    .o_VGA_R       (o_VGA_R         ),
+    .o_VGA_G       (o_VGA_G         ),
+    .o_VGA_B       (o_VGA_B         ),
+    .o_VGA_HS      (o_VGA_HS        ),
+    .o_VGA_VS      (o_VGA_VS        )
     );
 
 endmodule
