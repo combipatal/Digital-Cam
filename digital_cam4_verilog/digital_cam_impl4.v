@@ -23,7 +23,7 @@ module digital_cam_impl4 (
     input ov7670_pclk,
     output ov7670_xclk,
     input ov7670_vsync,
-    input ov7670_href,
+    input ov7670_hsync,
     input [7:0] ov7670_data,
     output ov7670_sioc,
     inout ov7670_siod,
@@ -217,7 +217,7 @@ module digital_cam_impl4 (
     ov7670_capture Inst_ov7670_capture (
 			.pclk(ov7670_pclk), 
 			.vsync(ov7670_vsync), 
-			.href(ov7670_href), 
+			.hsync(ov7670_hsync), 
 			.d(ov7670_data), 
 			.addr(wraddress_buf1_from_ov7670_capture), 
 			.dout(wrdata_buf1_from_ov7670_capture), 

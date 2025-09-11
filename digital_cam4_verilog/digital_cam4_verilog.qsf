@@ -99,7 +99,6 @@ set_location_assignment PIN_AE21 -to ov7670_siod
 set_location_assignment PIN_AF25 -to ov7670_vsync
 set_location_assignment PIN_AF16 -to ov7670_xclk
 set_location_assignment PIN_AC19 -to ov7670_pclk
-set_location_assignment PIN_AC22 -to ov7670_href
 set_location_assignment PIN_AF15 -to ov7670_reset
 set_location_assignment PIN_AD19 -to ov7670_pwdn
 set_location_assignment PIN_AB22 -to ov7670_data[0]
@@ -137,4 +136,5 @@ set_global_assignment -name VERILOG_FILE Address_Generator.v
 set_global_assignment -name QIP_FILE my_altpll.qip
 set_global_assignment -name QIP_FILE my_frame_buffer_15to0.qip
 set_global_assignment -name QIP_FILE PLL_clk.qip
+set_location_assignment PIN_AC22 -to ov7670_hsync
 set_instance_assignment -name PARTITION_HIERARCHY root_partition -to | -section_id Top

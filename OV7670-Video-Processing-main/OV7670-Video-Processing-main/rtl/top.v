@@ -21,9 +21,9 @@ module top(
     output wire[1:0] sdram_dqm, 
     inout[15:0] sdram_dq,
     // VGA
-    output wire[4:0] vga_out_r,
-    output wire[5:0] vga_out_g,
-    output wire[4:0] vga_out_b,
+    output wire[7:0] vga_r,
+    output wire[7:0] vga_g,
+    output wire[7:0] vga_b,
     output wire vga_out_vs, vga_out_hs
 );
  
@@ -122,7 +122,7 @@ module top(
         .sdram_dq   (sdram_dq)
     );
      
-    vga_interface i_vga_interface (
+    vga_top i_vga_interface (
         .clk        (clk_vga),
         .rst_n      (rst_n),
         .sobel      (sobel),
@@ -131,13 +131,16 @@ module top(
         .clk_vga    (clk_vga),
         .rd_en      (rd_en_vga),
         .threshold  (threshold),
-        .vga_out_r  (vga_out_r),
-        .vga_out_g  (vga_out_g),
-        .vga_out_b  (vga_out_b),
+        .vga_r  (vga_out_r),
+        .vga_g  (vga_out_g),
+        .vga_b  (vga_out_b),
         .vga_out_vs (vga_out_vs),
         .vga_out_hs (vga_out_hs)
     );
-     
+	 assign vga_r = {vga_out_r , 3'b111};
+    assign vga_g = {vga_out_g , 3'b111};
+	 assign vga_b = {vga_out_b , 3'b111};
+	 
     debounce_explicit debounce_key0 (.clk(clk), .rst_n(rst_n), .sw(!key[0]), .db_level(), .db_tick(key1_tick));
     debounce_explicit debounce_key1 (.clk(clk), .rst_n(rst_n), .sw(!key[1]), .db_level(), .db_tick(key2_tick));
     debounce_explicit debounce_key2 (.clk(clk), .rst_n(rst_n), .sw(!key[2]), .db_level(), .db_tick(key3_tick));

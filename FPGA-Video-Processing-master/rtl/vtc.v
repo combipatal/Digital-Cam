@@ -7,22 +7,22 @@
 module vtc 
     #(
     // total frame size
-    parameter RES_WIDTH     = 800,
-    parameter RES_HEIGHT    = 525,
-  
-    // active area  
-    parameter ACTIVE_X      = 640,
-    parameter ACTIVE_Y      = 480,
+	 parameter RES_WIDTH     = 416, // 이전: 800
+    parameter RES_HEIGHT    = 255, // 이전: 525
+
+    // active area
+    parameter ACTIVE_X      = 320, // 이전: 640
+    parameter ACTIVE_Y      = 240, // 이전: 480
 
     // hsync pulse width, back porch, front porch
-    parameter HSYNC_WIDTH   = 96,
-    parameter HSYNC_BP      = 48,
-    parameter HSYNC_FP      = 16,
+    parameter HSYNC_WIDTH   = 48,  // 이전: 96
+    parameter HSYNC_BP      = 32,  // 이전: 48
+    parameter HSYNC_FP      = 16,  // 이전: 16
 
     // vsync pulse width, back porch, front porch
-    parameter VSYNC_WIDTH   = 2,
-    parameter VSYNC_BP      = 33,
-    parameter VSYNC_FP      = 10,
+    parameter VSYNC_WIDTH   = 2,   // 이전: 2
+    parameter VSYNC_BP      = 10,  // 이전: 33
+    parameter VSYNC_FP      = 3,   // 이전: 10
 
     parameter COUNTER_WIDTH = 10
     )
@@ -62,7 +62,7 @@ module vtc
             counterX <= 0;
         end
         else begin
-            counterX <= (counterX == 799) ? 0 : (counterX + 1);
+            counterX <= (counterX == RES_WIDTH - 1) ? 0 : (counterX + 1); // 이전: 799
         end
     end
 
@@ -71,8 +71,8 @@ module vtc
             counterY <= 0;
         end
         else begin
-            if(counterX == 799) begin
-                counterY <= (counterY == 524) ? 0 : (counterY + 1);
+            if(counterX == RES_WIDTH - 1) begin // 이전: 799
+                counterY <= (counterY == RES_HEIGHT - 1) ? 0 : (counterY + 1); // 이전: 524
             end
         end
     end

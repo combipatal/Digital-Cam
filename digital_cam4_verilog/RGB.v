@@ -15,3 +15,4 @@ module RGB (
     assign B = Nblank ? {Din[3:0],  Din[3:0]}  : 8'h00;
 
 endmodule
+ 

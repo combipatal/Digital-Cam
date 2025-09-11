@@ -2,7 +2,7 @@
 
    module top_module(
 	input wire clk,rst_n,
-	input wire[3:0] key, //key[1:0] for increasing/decreasing threshold for edge detection,key[2] to change display between raw video or edge detected video
+	input wire[2:0] key, //key[1:0] for increasing/decreasing threshold for edge detection,key[2] to change display between raw video or edge detected video
 	//camera pinouts
 	input wire cmos_pclk,cmos_href,cmos_vsync,
 	input wire[7:0] cmos_db,
@@ -31,7 +31,6 @@
 	 wire clk_sdram;
 	 wire empty_fifo,empty;
 	 wire clk_vga;
-	 wire clk_165Mhz;
 	 wire state;
 	 wire rd_en,rd_fifo,key1_tick,key2_tick,key3_tick;
 	 reg[7:0] threshold=0;
@@ -147,19 +146,40 @@
 		.db_tick(key3_tick)
     );
 	
-	//SDRAM clock
-	PLL_165MHz m6
-   (// Clock in ports
-    .inclk0(clk),      // IN
-    // Clock out ports
-    .c0(clk_sdram),     // OUT
-	 .c1(clk_165Mhz),
-    // Status and control signals
-    .areset(RESET),// IN
-    .LOCKED());      // OUT
-	 
-	 
-	assign sdram_clk = clk_165Mhz;
+	PLL_165MHz m6(
+	.areset(!rst_n),
+	.inclk0(clk),
+	.c0(clk_sdram),
+	.c1(sdram_clk),
+	.locked()
+	);
+	
+	
+	
+//	//SDRAM clock
+//	dcm_165MHz m6
+//   (// Clock in ports
+//    .clk(clk),      // IN
+//    // Clock out ports
+//    .clk_sdram(clk_sdram),     // OUT
+//    // Status and control signals
+//    .RESET(RESET),// IN
+//    .LOCKED(LOCKED));      // OUT
+//	 
+//	 
+//	//ERROR APPEARS IF ODDR2 IS ROUTED INSIDE THE FPGA INSTEAD OF BEING DIRECTLY CONNECTED TO OUTPUT (thus we bring this outside instead of being inside the sdram_controller module)
+//	 ODDR2#(.DDR_ALIGNMENT("NONE"), .INIT(1'b0),.SRTYPE("SYNC")) oddr2_primitive
+//	 (
+//		.D0(1'b0),
+//		.D1(1'b1),
+//		.C0(clk_sdram),
+//		.C1(~clk_sdram),
+//		.CE(1'b1),
+//		.R(1'b0),
+//		.S(1'b0),
+//		.Q(sdram_clk)
+//	);
+//	
 	
 
 

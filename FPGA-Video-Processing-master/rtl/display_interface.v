@@ -14,7 +14,7 @@ module display_interface
     input  wire        i_mode,       // 출력 모드 선택 (1: 그레이스케일, 0: 컬러)
 
     // frame buffer interface
-    output reg  [18:0] o_raddr,      // 프레임 버퍼 읽기 주소 (640*480 = 307,200)
+    output reg  [16:0] o_raddr,      // 프레임 버퍼 읽기 주소 (640*480 = 307,200)
     input  wire [11:0] i_rdata,      // 프레임 버퍼로부터 읽은 픽셀 데이터
 
     // VGA
@@ -29,7 +29,7 @@ module display_interface
 // =============================================================
 //              내부 신호 및 레지스터 정의
 // =============================================================
-    reg  [18:0] nxt_raddr;           // 다음 프레임 버퍼 읽기 주소
+    reg  [16:0] nxt_raddr;           // 다음 프레임 버퍼 읽기 주소
 
     wire        vsync, hsync, active; // 수직/수평 동기화, 화면 활성 신호
     wire [9:0]  counterX, counterY;   // 현재 픽셀의 X/Y 좌표
@@ -68,28 +68,28 @@ module display_interface
             // 초기 상태: 카메라 설정을 위해 2프레임 대기
             // 한 프레임(640x480)이 완료되면 STATE_DELAY로 전환
             STATE_INITIAL: begin
-                NEXT_STATE = ((counterX == 640) && (counterY == 480)) ? STATE_DELAY:STATE_INITIAL;
+                NEXT_STATE = ((counterX == 320) && (counterY == 240)) ? STATE_DELAY:STATE_INITIAL; // 이전: 640, 480
             end
 
             STATE_DELAY: begin
-                NEXT_STATE = ((counterX == 640) && (counterY == 480)) ? STATE_ACTIVE:STATE_DELAY;
+                NEXT_STATE = ((counterX == 320) && (counterY == 240)) ? STATE_ACTIVE:STATE_DELAY; // 이전: 640, 480
             end
             
             STATE_IDLE: begin
-                if((counterX == 799)&&((counterY==524)||(counterY<480))) begin
+                if((counterX == 415)&&((counterY==254)||(counterY<240))) begin // 이전: 799, 524, 480
                     nxt_raddr  = o_raddr + 1;
                     NEXT_STATE = STATE_ACTIVE;
                 end
-                else if(counterY > 479) begin
+                else if(counterY > 239) begin // 이전: 479
                     nxt_raddr = 0;
                 end
             end
                // 활성 상태: 프레임 버퍼에서 데이터 읽기
             STATE_ACTIVE: begin
                 // 활성 영역이고 현재 라인 내부인 경우
-                if(active && (counterX < 639)) begin
+                if(active && (counterX < 319)) begin // 이전: 639
                     // 마지막 픽셀(307199)이면 처음으로, 아니면 다음 주소로
-                    nxt_raddr = (o_raddr == 307199) ? 0:o_raddr+1;
+                    nxt_raddr = (o_raddr == 76799) ? 0:o_raddr+1; // 이전: 307199
                 end
                 else begin
                     NEXT_STATE = STATE_IDLE;   // 대기 상태로 전환

@@ -378,15 +378,12 @@
     ); 
 	 
 	 
-	 PLL_24MHz m1
-   (// Clock in ports
-    .inclk0(clk),      // IN
-    // Clock out ports
-    .c0(cmos_xclk),     // OUT
-    // Status and control signals
-    .areset(RESET),// IN
-    .locked(LOCKED));      // OUT
-	 
+	PLL_24MHz m1 (
+		.areset(!rst_n),
+		.inclk0(clk),
+		.c0(cmos_xclk),
+		.locked()
+	);
 
 	asyn_fifo #(.DATA_WIDTH(16),.FIFO_DEPTH_WIDTH(10)) m2 //1024x16 FIFO mem
 	(

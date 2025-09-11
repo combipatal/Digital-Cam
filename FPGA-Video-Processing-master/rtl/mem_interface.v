@@ -5,7 +5,7 @@ module mem_interface
     #(
     parameter DATA_WIDTH = 12,
     parameter FILL_WIDTH = 10,
-    parameter BRAM_DEPTH = 307200
+    parameter BRAM_DEPTH = 76800 
     )
     (
     input wire                   i_clk,        // 125 MHz board clock
@@ -91,7 +91,7 @@ module mem_interface
             WSTATE_ACTIVE: begin
                 nxt_rd        = (!i_almostempty);
                 nxt_mem_wr    = (!i_almostempty);
-                nxt_mem_waddr = (mem_waddr == 307199) ? 0:mem_waddr+1;
+                nxt_mem_waddr = (mem_waddr == BRAM_DEPTH - 1) ? 0 : mem_waddr + 1; // 이전: (mem_waddr == 307199)
                 if(i_almostempty) begin
                     NEXT_WSTATE = WSTATE_IDLE;
                 end

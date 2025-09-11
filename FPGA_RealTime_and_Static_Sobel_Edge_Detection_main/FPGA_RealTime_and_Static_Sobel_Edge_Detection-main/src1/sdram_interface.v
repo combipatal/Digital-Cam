@@ -125,7 +125,7 @@ module sdram_interface(
 		.f2s_data_valid(f2s_data_valid), //asserts while burst-writing(data must be available at input BEFORE the next rising edge)
 		.ready(ready), //"1" if sdram is available for nxt read/write operation
 		//controller to sdram
-		.s_clk(sdram_clk),
+		//.s_clk(sdram_clk),
 		.s_cke(sdram_cke), 
 		.s_cs_n(sdram_cs_n),
 		.s_ras_n(sdram_ras_n ), 

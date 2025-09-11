@@ -13,7 +13,7 @@ module sdram_controller(
 	output reg ready, //"1" if sdram is available for nxt read/write operation
 	
 	//controller to sdram
-	output wire s_clk,
+	//output wire s_clk,
 	output wire s_cke, //always high for almost all operations(except for self-refresh w/c I did not use here)
 	output wire s_cs_n, s_ras_n, s_cas_n, s_we_n, //commands
 	output wire[12:0] s_addr, //row/colum address bus
@@ -50,8 +50,6 @@ module sdram_controller(
     );
 	 */
 	 
-	 //s_clock(clk input to sdram) is 180 degrees lagging from main clock to solve the hold-setup time requirements of sdram
-
 	//FSM states		//initialize
 	 localparam[3:0]  start=0,
 							precharge_init=1, 
