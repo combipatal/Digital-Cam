@@ -5,6 +5,7 @@ module digital_cam_top (
     input  wire        btn_resend,     // 카메라 설정 재시작 버튼
     input  wire        sw_grayscale,   // SW[0] 그레이스케일 모드 스위치
     input  wire        sw_sobel,       // SW[1] 소벨 필터 모드 스위치
+    input  wire        sw_filter,      // SW[2] 디지털 필터 모드 스위치
     output wire        led_config_finished,  // 설정 완료 LED
     
     // VGA 출력 신호들
@@ -95,10 +96,12 @@ module digital_cam_top (
     // 읽기 데이터 멀티플렉싱 - 상위 비트에 따라 어느 RAM에서 읽을지 결정
     assign rddata = rdaddress[16] ? rddata_ram2 : rddata_ram1;
     
-    // RGB 변환 및 그레이스케일, 소벨 필터 모드
+    // RGB 변환 및 그레이스케일, 소벨 필터, 디지털 필터 모드
     wire [7:0] gray_value;           // 그레이스케일 값
     wire [7:0] red_value, green_value, blue_value;  // RGB 값들
     wire [7:0] sobel_value;          // 소벨 필터 값
+    wire [11:0] filtered_pixel;      // 디지털 필터 적용된 픽셀
+    wire filter_ready;               // 필터 처리 완료 신호
     
     // 시프트 연산을 사용한 그레이스케일 값 계산
     // Y = (R + 2*G + B) >> 2 (4로 나누는 것과 동일)
@@ -112,31 +115,86 @@ module digital_cam_top (
     assign gray_sum = r_ext + g_ext + g_ext + b_ext;  // R + 2*G + B
     assign gray_value = activeArea ? gray_sum[8:2] : 8'h00;  // >> 2 (4로 나누기)
     
-    // 소벨 엣지 검출 필터
-    // 이는 단순화된 버전 - 완전한 구현을 위해서는 라인 버퍼가 필요
-    reg [7:0] prev_gray = 8'h00;  // 이전 그레이스케일 값
-    wire [7:0] edge_magnitude;    // 엣지 강도
+    // 파이프라인 지연 보정을 위한 지연 레지스터들 (6클럭 지연)
+    reg [16:0] rdaddress_delayed [5:0];
+    reg activeArea_delayed [5:0];
+    reg [7:0] sobel_value_delayed;
+    reg sobel_ready_delayed;
     
+    // 6클럭 지연 (파이프라인 지연과 동기화)
     always @(posedge clk_25_vga) begin
-        if (activeArea) begin
-            prev_gray <= gray_value;  // 현재 그레이스케일 값을 이전 값으로 저장
-        end
+        rdaddress_delayed[0] <= rdaddress;
+        activeArea_delayed[0] <= activeArea;
+        
+        rdaddress_delayed[1] <= rdaddress_delayed[0];
+        activeArea_delayed[1] <= activeArea_delayed[0];
+        
+        rdaddress_delayed[2] <= rdaddress_delayed[1];
+        activeArea_delayed[2] <= activeArea_delayed[1];
+        
+        rdaddress_delayed[3] <= rdaddress_delayed[2];
+        activeArea_delayed[3] <= activeArea_delayed[2];
+        
+        rdaddress_delayed[4] <= rdaddress_delayed[3];
+        activeArea_delayed[4] <= activeArea_delayed[3];
+        
+        rdaddress_delayed[5] <= rdaddress_delayed[4];
+        activeArea_delayed[5] <= activeArea_delayed[4];
+        
+        sobel_value_delayed <= sobel_value;
+        sobel_ready_delayed <= sobel_ready;
     end
     
-    // 단순한 엣지 검출: |현재 - 이전|
-    assign edge_magnitude = (gray_value > prev_gray) ? (gray_value - prev_gray) : (prev_gray - gray_value);
-    assign sobel_value = activeArea ? edge_magnitude : 8'h00;
+    // 소벨 엣지 검출 필터 (sobel_3x3_final.v 사용)
+    wire sobel_ready;
+    
+    sobel_3x3_final sobel_inst (
+        .clk(clk_25_vga),            // 25MHz VGA 클럭
+        .enable(sw_sobel),           // SW1로 소벨 필터 활성화
+        .pixel_in(rddata),           // RAM에서 읽은 픽셀 데이터
+        .pixel_addr(rdaddress),      // 픽셀 주소
+        .vsync(vSync),               // 수직 동기화
+        .active_area(activeArea),    // 활성 영역 신호
+        .sobel_value(sobel_value),   // 소벨 필터 값
+        .sobel_ready(sobel_ready)    // 필터 처리 완료 신호
+    );
     
     // 색상 값들 - 4비트를 8비트로 확장
     assign red_value = activeArea ? {rddata[11:8], 4'b1111} : 8'h00;
     assign green_value = activeArea ? {rddata[7:4], 4'b1111} : 8'h00;
     assign blue_value = activeArea ? {rddata[3:0], 4'b1111} : 8'h00;
     
+    // 간단한 노이즈 제거 필터 인스턴스
+    simple_noise_filter filter_inst (
+        .clk(clk_25_vga),            // 25MHz VGA 클럭
+        .enable(sw_filter),           // SW2로 필터 활성화
+        .pixel_in(rddata),            // RAM에서 읽은 픽셀 데이터
+        .pixel_addr(rdaddress),       // 픽셀 주소
+        .vsync(vSync),                // 수직 동기화
+        .active_area(activeArea),     // 활성 영역 신호
+        .pixel_out(filtered_pixel),   // 필터 적용된 픽셀
+        .filter_ready(filter_ready)   // 필터 처리 완료 신호
+    );
+    
     // 스위치에 따른 출력 선택
     wire [7:0] final_r, final_g, final_b;
-    assign final_r = sw_sobel ? sobel_value : (sw_grayscale ? gray_value : red_value);
-    assign final_g = sw_sobel ? sobel_value : (sw_grayscale ? gray_value : green_value);
-    assign final_b = sw_sobel ? sobel_value : (sw_grayscale ? gray_value : blue_value);
+    wire [7:0] filter_r, filter_g, filter_b;
+    
+    // 필터 적용된 픽셀에서 RGB 분리 (지연된 활성 영역 사용)
+    assign filter_r = activeArea_delayed[5] ? {filtered_pixel[11:8], 4'b1111} : 8'h00;
+    assign filter_g = activeArea_delayed[5] ? {filtered_pixel[7:4], 4'b1111} : 8'h00;
+    assign filter_b = activeArea_delayed[5] ? {filtered_pixel[3:0], 4'b1111} : 8'h00;
+    
+    // 우선순위: 소벨 > 그레이스케일 > 디지털 필터 > 원본 (파이프라인 지연 보정 적용)
+    assign final_r = sw_sobel ? sobel_value_delayed : 
+                     (sw_grayscale ? gray_value : 
+                      (sw_filter ? filter_r : red_value));
+    assign final_g = sw_sobel ? sobel_value_delayed : 
+                     (sw_grayscale ? gray_value : 
+                      (sw_filter ? filter_g : green_value));
+    assign final_b = sw_sobel ? sobel_value_delayed : 
+                     (sw_grayscale ? gray_value : 
+                      (sw_filter ? filter_b : blue_value));
     
     // VGA 출력 연결
     assign vga_r = final_r;
