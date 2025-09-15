@@ -46,13 +46,13 @@ module frame_buffer_ram (
 	wren,
 	q);
 
-	input	[11:0]  data;
+	input	[15:0]  data;
 	input	[15:0]  rdaddress;
 	input	  rdclock;
 	input	[15:0]  wraddress;
 	input	  wrclock;
 	input	  wren;
-	output	[11:0]  q;
+	output	[15:0]  q;
 `ifndef ALTERA_RESERVED_QIS
 // synopsys translate_off
 `endif
@@ -62,8 +62,8 @@ module frame_buffer_ram (
 // synopsys translate_on
 `endif
 
-	wire [11:0] sub_wire0;
-	wire [11:0] q = sub_wire0[11:0];
+	wire [15:0] sub_wire0;
+	wire [15:0] q = sub_wire0[15:0];
 
 	altsyncram	altsyncram_component (
 				.address_a (wraddress),
@@ -83,7 +83,7 @@ module frame_buffer_ram (
 				.clocken1 (1'b1),
 				.clocken2 (1'b1),
 				.clocken3 (1'b1),
-				.data_b ({12{1'b1}}),
+				.data_b ({16{1'b1}}),
 				.eccstatus (),
 				.q_a (),
 				.rden_a (1'b1),
@@ -105,8 +105,8 @@ module frame_buffer_ram (
 		altsyncram_component.power_up_uninitialized = "FALSE",
 		altsyncram_component.widthad_a = 16,
 		altsyncram_component.widthad_b = 16,
-		altsyncram_component.width_a = 12,
-		altsyncram_component.width_b = 12,
+		altsyncram_component.width_a = 16,
+		altsyncram_component.width_b = 16,
 		altsyncram_component.width_byteena_a = 1;
 
 
@@ -145,7 +145,7 @@ endmodule
 // Retrieval info: PRIVATE: JTAG_ENABLED NUMERIC "0"
 // Retrieval info: PRIVATE: JTAG_ID STRING "NONE"
 // Retrieval info: PRIVATE: MAXIMUM_DEPTH NUMERIC "0"
-// Retrieval info: PRIVATE: MEMSIZE NUMERIC "786432"
+// Retrieval info: PRIVATE: MEMSIZE NUMERIC "1048576"
 // Retrieval info: PRIVATE: MEM_IN_BITS NUMERIC "0"
 // Retrieval info: PRIVATE: MIFfilename STRING ""
 // Retrieval info: PRIVATE: OPERATION_MODE NUMERIC "2"
@@ -165,10 +165,10 @@ endmodule
 // Retrieval info: PRIVATE: USE_DIFF_CLKEN NUMERIC "0"
 // Retrieval info: PRIVATE: UseDPRAM NUMERIC "1"
 // Retrieval info: PRIVATE: VarWidth NUMERIC "0"
-// Retrieval info: PRIVATE: WIDTH_READ_A NUMERIC "12"
-// Retrieval info: PRIVATE: WIDTH_READ_B NUMERIC "12"
-// Retrieval info: PRIVATE: WIDTH_WRITE_A NUMERIC "12"
-// Retrieval info: PRIVATE: WIDTH_WRITE_B NUMERIC "12"
+// Retrieval info: PRIVATE: WIDTH_READ_A NUMERIC "16"
+// Retrieval info: PRIVATE: WIDTH_READ_B NUMERIC "16"
+// Retrieval info: PRIVATE: WIDTH_WRITE_A NUMERIC "16"
+// Retrieval info: PRIVATE: WIDTH_WRITE_B NUMERIC "16"
 // Retrieval info: PRIVATE: WRADDR_ACLR_B NUMERIC "0"
 // Retrieval info: PRIVATE: WRADDR_REG_B NUMERIC "0"
 // Retrieval info: PRIVATE: WRCTRL_ACLR_B NUMERIC "0"
@@ -190,11 +190,11 @@ endmodule
 // Retrieval info: CONSTANT: POWER_UP_UNINITIALIZED STRING "FALSE"
 // Retrieval info: CONSTANT: WIDTHAD_A NUMERIC "16"
 // Retrieval info: CONSTANT: WIDTHAD_B NUMERIC "16"
-// Retrieval info: CONSTANT: WIDTH_A NUMERIC "12"
-// Retrieval info: CONSTANT: WIDTH_B NUMERIC "12"
+// Retrieval info: CONSTANT: WIDTH_A NUMERIC "16"
+// Retrieval info: CONSTANT: WIDTH_B NUMERIC "16"
 // Retrieval info: CONSTANT: WIDTH_BYTEENA_A NUMERIC "1"
-// Retrieval info: USED_PORT: data 0 0 12 0 INPUT NODEFVAL "data[11..0]"
-// Retrieval info: USED_PORT: q 0 0 12 0 OUTPUT NODEFVAL "q[11..0]"
+// Retrieval info: USED_PORT: data 0 0 16 0 INPUT NODEFVAL "data[15..0]"
+// Retrieval info: USED_PORT: q 0 0 16 0 OUTPUT NODEFVAL "q[15..0]"
 // Retrieval info: USED_PORT: rdaddress 0 0 16 0 INPUT NODEFVAL "rdaddress[15..0]"
 // Retrieval info: USED_PORT: rdclock 0 0 0 0 INPUT NODEFVAL "rdclock"
 // Retrieval info: USED_PORT: wraddress 0 0 16 0 INPUT NODEFVAL "wraddress[15..0]"
@@ -204,9 +204,9 @@ endmodule
 // Retrieval info: CONNECT: @address_b 0 0 16 0 rdaddress 0 0 16 0
 // Retrieval info: CONNECT: @clock0 0 0 0 0 wrclock 0 0 0 0
 // Retrieval info: CONNECT: @clock1 0 0 0 0 rdclock 0 0 0 0
-// Retrieval info: CONNECT: @data_a 0 0 12 0 data 0 0 12 0
+// Retrieval info: CONNECT: @data_a 0 0 16 0 data 0 0 16 0
 // Retrieval info: CONNECT: @wren_a 0 0 0 0 wren 0 0 0 0
-// Retrieval info: CONNECT: q 0 0 12 0 @q_b 0 0 12 0
+// Retrieval info: CONNECT: q 0 0 16 0 @q_b 0 0 16 0
 // Retrieval info: GEN_FILE: TYPE_NORMAL frame_buffer_ram.v TRUE
 // Retrieval info: GEN_FILE: TYPE_NORMAL frame_buffer_ram.inc FALSE
 // Retrieval info: GEN_FILE: TYPE_NORMAL frame_buffer_ram.cmp FALSE

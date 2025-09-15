@@ -2,11 +2,11 @@
 module simple_noise_filter (
     input  wire        clk,           // 25MHz VGA 클럭
     input  wire        enable,        // 필터 활성화 신호
-    input  wire [11:0] pixel_in,      // 입력 픽셀 (RGB 4:4:4)
+    input  wire [15:0] pixel_in,      // 입력 픽셀 (RGB565)
     input  wire [16:0] pixel_addr,    // 픽셀 주소
     input  wire        vsync,         // 수직 동기화
     input  wire        active_area,   // 활성 영역 신호
-    output reg  [11:0] pixel_out,     // 출력 픽셀 (필터 적용 후)
+    output reg  [15:0] pixel_out,     // 출력 픽셀 (필터 적용 후, RGB565)
     output reg         filter_ready   // 필터 처리 완료 신호
 );
 
@@ -18,30 +18,34 @@ module simple_noise_filter (
     wire valid_addr = (x_pos < 320) && (y_pos < 240);
     
     // 1줄 라인 버퍼 (이전 픽셀 저장)
-    reg [11:0] line_buffer [319:0];
+    reg [15:0] line_buffer [319:0];
     
     // 이전 픽셀
-    wire [11:0] prev_pixel = (x_pos > 0) ? line_buffer[x_pos-1] : 12'h000;
+    wire [15:0] prev_pixel = (x_pos > 0) ? line_buffer[x_pos-1] : 16'h0000;
     
-    // RGB 분리
-    wire [3:0] r_curr, g_curr, b_curr;
-    wire [3:0] r_prev, g_prev, b_prev;
-    
-    assign {r_curr, g_curr, b_curr} = pixel_in;
-    assign {r_prev, g_prev, b_prev} = prev_pixel;
-    
+    // RGB565 분리: R5 G6 B5
+    wire [4:0] r_curr_5, b_curr_5, r_prev_5, b_prev_5;
+    wire [5:0] g_curr_6, g_prev_6;
+    assign r_curr_5 = pixel_in[15:11];
+    assign g_curr_6 = pixel_in[10:5];
+    assign b_curr_5 = pixel_in[4:0];
+    assign r_prev_5 = prev_pixel[15:11];
+    assign g_prev_6 = prev_pixel[10:5];
+    assign b_prev_5 = prev_pixel[4:0];
+
     // 필터 처리 결과
-    reg [3:0] filtered_r, filtered_g, filtered_b;
+    reg [4:0] filtered_r5, filtered_b5;
+    reg [5:0] filtered_g6;
     
     // 간단한 노이즈 제거 필터 (현재 + 이전) / 2
     always @(posedge clk) begin
         if (enable && valid_addr && active_area) begin
             // 현재 픽셀과 이전 픽셀의 평균
-            filtered_r <= (r_curr + r_prev) >> 1;
-            filtered_g <= (g_curr + g_prev) >> 1;
-            filtered_b <= (b_curr + b_prev) >> 1;
-            
-            pixel_out <= {filtered_r, filtered_g, filtered_b};
+            filtered_r5 <= (r_curr_5 + r_prev_5) >> 1;
+            filtered_g6 <= (g_curr_6 + g_prev_6) >> 1;
+            filtered_b5 <= (b_curr_5 + b_prev_5) >> 1;
+
+            pixel_out <= {filtered_r5, filtered_g6, filtered_b5};
             filter_ready <= 1'b1;
         end else begin
             pixel_out <= pixel_in;
@@ -65,7 +69,7 @@ module simple_noise_filter (
         end else if (!reset_done) begin
             // VSYNC 리셋 중
             if (reset_counter < 320) begin
-                line_buffer[reset_counter] <= 12'h000;
+                line_buffer[reset_counter] <= 16'h0000;
                 reset_counter <= reset_counter + 1'b1;
             end else begin
                 reset_done <= 1'b1;

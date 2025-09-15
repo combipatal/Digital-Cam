@@ -6,7 +6,7 @@ module ov7670_capture (
     input  wire        href,    // 수평 참조 신호 (라인 유효 신호)
     input  wire [7:0]  d,       // 픽셀 데이터 (8비트)
     output wire [16:0] addr,    // RAM 쓰기 주소
-    output wire [11:0] dout,    // RAM 쓰기 데이터 (RGB565 -> 12비트)
+    output wire [15:0] dout,    // RAM 쓰기 데이터 (RGB565 16비트)
     output reg         we       // RAM 쓰기 활성화 신호
 );
 
@@ -22,7 +22,7 @@ module ov7670_capture (
     
     // 출력 신호 연결
     assign addr = address;  // RAM 쓰기 주소
-    assign dout = {d_latch[15:12], d_latch[10:7], d_latch[4:1]};  // RGB565 -> 12비트 변환 , 그냥 16비트로 받고 RGB888로 변환
+    assign dout = d_latch;  // RGB565 16비트 그대로 출력
     
     always @(posedge pclk) begin
         // 주소 증가 - RAM에 쓰기가 완료되면 다음 주소로

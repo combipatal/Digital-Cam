@@ -38,17 +38,17 @@ module digital_cam_top (
     wire nBlank;         // VGA 블랭킹 신호
     wire vSync;          // VGA 수직 동기화
     wire [16:0] wraddress;  // RAM 쓰기 주소
-    wire [11:0] wrdata;     // RAM 쓰기 데이터
+    wire [15:0] wrdata;     // RAM 쓰기 데이터 (RGB565)
     wire [16:0] rdaddress;  // RAM 읽기 주소
-    wire [11:0] rddata;     // RAM 읽기 데이터
+    wire [15:0] rddata;     // RAM 읽기 데이터 (RGB565)
     wire activeArea;        // VGA 활성 영역
     
     // 듀얼 프레임 버퍼 신호들 (320x240 = 76800 픽셀을 두 개의 RAM으로 분할)
     wire [15:0] wraddress_ram1, rdaddress_ram1; // RAM1: 16비트 주소 (0-32767)
     wire [15:0] wraddress_ram2, rdaddress_ram2; // RAM2: 16비트 주소 (0-44031)
-    wire [11:0] wrdata_ram1, wrdata_ram2;       // 각 RAM의 쓰기 데이터
+    wire [15:0] wrdata_ram1, wrdata_ram2;       // 각 RAM의 쓰기 데이터 (RGB565)
     wire wren_ram1, wren_ram2;                  // 각 RAM의 쓰기 활성화
-    wire [11:0] rddata_ram1, rddata_ram2;       // 각 RAM의 읽기 데이터
+    wire [15:0] rddata_ram1, rddata_ram2;       // 각 RAM의 읽기 데이터 (RGB565)
     
     // 카메라 리셋용 버튼 디바운싱
     reg [19:0] btn_counter = 20'd0;     // 버튼 카운터 (20ms 디바운싱용)
@@ -100,58 +100,80 @@ module digital_cam_top (
     wire [7:0] gray_value;           // 그레이스케일 값
     wire [7:0] red_value, green_value, blue_value;  // RGB 값들
     wire [7:0] sobel_value;          // 소벨 필터 값
-    wire [11:0] filtered_pixel;      // 디지털 필터 적용된 픽셀
+    wire [23:0] filtered_pixel;      // 디지털 필터 적용된 픽셀 (RGB888)
     wire filter_ready;               // 필터 처리 완료 신호
+    wire sobel_ready;                // 소벨 처리 완료 신호 (선언을 앞당겨 사용 이전에 배치)
     
-    // 시프트 연산을 사용한 그레이스케일 값 계산
-    // Y = (R + 2*G + B) >> 2 (4로 나누는 것과 동일)
-    wire [7:0] r_ext, g_ext, b_ext;  // 확장된 RGB 값들
+    // RGB565 → RGB888 직접 변환 (화질 최적화)
+    // RGB565: R[15:11] G[10:5] B[4:0]
+    // RGB888: R[7:0] G[7:0] B[7:0]
+    wire [7:0] r_888, g_888, b_888;  // RGB888로 확장된 값들
+    
+    assign r_888 = {rddata[15:11], 3'b000};  // 5비트 → 8비트 (x8)
+    assign g_888 = {rddata[10:5], 2'b00};    // 6비트 → 8비트 (x4)
+    assign b_888 = {rddata[4:0], 3'b000};    // 5비트 → 8비트 (x8)
+    
+    // RGB888을 하나의 24비트 픽셀로 결합 (필터 입력용)
+    wire [23:0] rgb888_pixel = {r_888, g_888, b_888};
+    
+    // 그레이스케일 계산 (RGB888 기준)
     wire [8:0] gray_sum;             // 그레이스케일 합계
-    
-    assign r_ext = {rddata[11:8], 4'b0000};  // R을 8비트로 확장
-    assign g_ext = {rddata[7:4], 4'b0000};   // G을 8비트로 확장
-    assign b_ext = {rddata[3:0], 4'b0000};   // B를 8비트로 확장
-    
-    assign gray_sum = r_ext + g_ext + g_ext + b_ext;  // R + 2*G + B
+    assign gray_sum = r_888 + g_888 + g_888 + b_888;  // R + 2*G + B
     assign gray_value = activeArea ? gray_sum[8:2] : 8'h00;  // >> 2 (4로 나누기)
     
-    // 파이프라인 지연 보정을 위한 지연 레지스터들 (6클럭 지연)
-    reg [16:0] rdaddress_delayed [5:0];
-    reg activeArea_delayed [5:0];
-    reg [7:0] sobel_value_delayed;
-    reg sobel_ready_delayed;
+    // 필터 적용된 픽셀에서 RGB 분리 (RGB888 직접 사용)
+    wire [7:0] filter_r_888, filter_g_888, filter_b_888;
+    assign filter_r_888 = filtered_pixel[23:16];  // R 채널
+    assign filter_g_888 = filtered_pixel[15:8];   // G 채널
+    assign filter_b_888 = filtered_pixel[7:0];    // B 채널
     
-    // 6클럭 지연 (파이프라인 지연과 동기화)
+    // 통합 파이프라인 지연 (가변 인덱스로 최종 정렬 손쉽게 조정)
+    localparam integer PIPE_IDX = 5; // 필요시 4~7 사이로 조정
+    reg [16:0] rdaddress_delayed [6:0];
+    reg activeArea_delayed [6:0];
+    reg [7:0] sobel_value_delayed [6:0];
+    reg [7:0] red_value_delayed [6:0], green_value_delayed [6:0], blue_value_delayed [6:0];
+    reg [7:0] gray_value_delayed [6:0];
+    reg [23:0] filtered_pixel_delayed [6:0];
+    reg [7:0] filter_r_delayed [6:0], filter_g_delayed [6:0], filter_b_delayed [6:0];
+    integer i; 
+    
+	 // 7클럭 통합 지연
     always @(posedge clk_25_vga) begin
+        // 0단계
         rdaddress_delayed[0] <= rdaddress;
         activeArea_delayed[0] <= activeArea;
+        sobel_value_delayed[0] <= sobel_value;
+        red_value_delayed[0] <= red_value;
+        green_value_delayed[0] <= green_value;
+        blue_value_delayed[0] <= blue_value;
+        gray_value_delayed[0] <= gray_value;
+        filtered_pixel_delayed[0] <= filtered_pixel;
+        filter_r_delayed[0] <= filter_r_888;
+        filter_g_delayed[0] <= filter_g_888;
+        filter_b_delayed[0] <= filter_b_888;
         
-        rdaddress_delayed[1] <= rdaddress_delayed[0];
-        activeArea_delayed[1] <= activeArea_delayed[0];
-        
-        rdaddress_delayed[2] <= rdaddress_delayed[1];
-        activeArea_delayed[2] <= activeArea_delayed[1];
-        
-        rdaddress_delayed[3] <= rdaddress_delayed[2];
-        activeArea_delayed[3] <= activeArea_delayed[2];
-        
-        rdaddress_delayed[4] <= rdaddress_delayed[3];
-        activeArea_delayed[4] <= activeArea_delayed[3];
-        
-        rdaddress_delayed[5] <= rdaddress_delayed[4];
-        activeArea_delayed[5] <= activeArea_delayed[4];
-        
-        sobel_value_delayed <= sobel_value;
-        sobel_ready_delayed <= sobel_ready;
+        // 1-6단계
+        for (i= 1; i <= 6; i = i + 1) begin
+            rdaddress_delayed[i] <= rdaddress_delayed[i-1];
+            activeArea_delayed[i] <= activeArea_delayed[i-1];
+            sobel_value_delayed[i] <= sobel_value_delayed[i-1];
+            red_value_delayed[i] <= red_value_delayed[i-1];
+            green_value_delayed[i] <= green_value_delayed[i-1];
+            blue_value_delayed[i] <= blue_value_delayed[i-1];
+            gray_value_delayed[i] <= gray_value_delayed[i-1];
+            filtered_pixel_delayed[i] <= filtered_pixel_delayed[i-1];
+            filter_r_delayed[i] <= filter_r_delayed[i-1];
+            filter_g_delayed[i] <= filter_g_delayed[i-1];
+            filter_b_delayed[i] <= filter_b_delayed[i-1];
+        end
     end
-    
-    // 소벨 엣지 검출 필터 (sobel_3x3_final.v 사용)
-    wire sobel_ready;
-    
-    sobel_3x3_final sobel_inst (
+
+    // 소벨 엣지 검출 필터 (RGB888용) - 원본 입력 사용
+    sobel_3x3_rgb888 sobel_inst (
         .clk(clk_25_vga),            // 25MHz VGA 클럭
         .enable(sw_sobel),           // SW1로 소벨 필터 활성화
-        .pixel_in(rddata),           // RAM에서 읽은 픽셀 데이터
+        .pixel_in(rgb888_pixel),     // 원본 RGB888 입력
         .pixel_addr(rdaddress),      // 픽셀 주소
         .vsync(vSync),               // 수직 동기화
         .active_area(activeArea),    // 활성 영역 신호
@@ -159,20 +181,20 @@ module digital_cam_top (
         .sobel_ready(sobel_ready)    // 필터 처리 완료 신호
     );
     
-    // 색상 값들 - 4비트를 8비트로 확장
-    assign red_value = activeArea ? {rddata[11:8], 4'b1111} : 8'h00;
-    assign green_value = activeArea ? {rddata[7:4], 4'b1111} : 8'h00;
-    assign blue_value = activeArea ? {rddata[3:0], 4'b1111} : 8'h00;
+    // 색상 값들 - RGB888 직접 사용
+    assign red_value = activeArea ? r_888 : 8'h00;
+    assign green_value = activeArea ? g_888 : 8'h00;
+    assign blue_value = activeArea ? b_888 : 8'h00;
     
-    // 간단한 노이즈 제거 필터 인스턴스
-    simple_noise_filter filter_inst (
+    // 가우시안 블러 필터 인스턴스 (RGB888용) - 항상 계산, SW2는 화면 선택만 담당
+    gaussian_3x3_rgb888 filter_inst (
         .clk(clk_25_vga),            // 25MHz VGA 클럭
-        .enable(sw_filter),           // SW2로 필터 활성화
-        .pixel_in(rddata),            // RAM에서 읽은 픽셀 데이터
+        .enable(1'b1),                // 항상 동작
+        .pixel_in(rgb888_pixel),      // RGB888 픽셀 데이터
         .pixel_addr(rdaddress),       // 픽셀 주소
         .vsync(vSync),                // 수직 동기화
         .active_area(activeArea),     // 활성 영역 신호
-        .pixel_out(filtered_pixel),   // 필터 적용된 픽셀
+        .pixel_out(filtered_pixel),   // 필터 적용된 픽셀 (RGB888)
         .filter_ready(filter_ready)   // 필터 처리 완료 신호
     );
     
@@ -180,21 +202,16 @@ module digital_cam_top (
     wire [7:0] final_r, final_g, final_b;
     wire [7:0] filter_r, filter_g, filter_b;
     
-    // 필터 적용된 픽셀에서 RGB 분리 (지연된 활성 영역 사용)
-    assign filter_r = activeArea_delayed[5] ? {filtered_pixel[11:8], 4'b1111} : 8'h00;
-    assign filter_g = activeArea_delayed[5] ? {filtered_pixel[7:4], 4'b1111} : 8'h00;
-    assign filter_b = activeArea_delayed[5] ? {filtered_pixel[3:0], 4'b1111} : 8'h00;
-    
-    // 우선순위: 소벨 > 그레이스케일 > 디지털 필터 > 원본 (파이프라인 지연 보정 적용)
-    assign final_r = sw_sobel ? sobel_value_delayed : 
-                     (sw_grayscale ? gray_value : 
-                      (sw_filter ? filter_r : red_value));
-    assign final_g = sw_sobel ? sobel_value_delayed : 
-                     (sw_grayscale ? gray_value : 
-                      (sw_filter ? filter_g : green_value));
-    assign final_b = sw_sobel ? sobel_value_delayed : 
-                     (sw_grayscale ? gray_value : 
-                      (sw_filter ? filter_b : blue_value));
+    // 우선순위: 소벨 > 그레이스케일 > 디지털 필터 > 원본 (가변 지연 인덱스 적용)
+    assign final_r = sw_sobel ? sobel_value_delayed[PIPE_IDX] : 
+                     (sw_grayscale ? gray_value_delayed[PIPE_IDX] : 
+                      (sw_filter ? filter_r_delayed[PIPE_IDX] : red_value_delayed[PIPE_IDX]));
+    assign final_g = sw_sobel ? sobel_value_delayed[PIPE_IDX] : 
+                     (sw_grayscale ? gray_value_delayed[PIPE_IDX] : 
+                      (sw_filter ? filter_g_delayed[PIPE_IDX] : green_value_delayed[PIPE_IDX]));
+    assign final_b = sw_sobel ? sobel_value_delayed[PIPE_IDX] : 
+                     (sw_grayscale ? gray_value_delayed[PIPE_IDX] : 
+                      (sw_filter ? filter_b_delayed[PIPE_IDX] : blue_value_delayed[PIPE_IDX]));
     
     // VGA 출력 연결
     assign vga_r = final_r;

@@ -111,9 +111,12 @@ set_location_assignment PIN_AC28 -to sw_sobel
 set_global_assignment -name POWER_PRESET_COOLING_SOLUTION "23 MM HEAT SINK WITH 200 LFPM AIRFLOW"
 set_global_assignment -name POWER_BOARD_THERMAL_MODEL "NONE (CONSERVATIVE)"
 set_location_assignment PIN_AC27 -to sw_filter
-set_global_assignment -name VERILOG_FILE sobel_pipeline.v
-set_global_assignment -name VERILOG_FILE sobel_3x3_final.v
-set_global_assignment -name VERILOG_FILE simple_noise_filter.v
+set_location_assignment PIN_N21 -to btn_thr_down
+set_location_assignment PIN_R24 -to btn_thr_up
+set_location_assignment PIN_AD27 -to sw_thr_select
+set_global_assignment -name VERILOG_FILE gaussian_3x3_rgb888.v
+set_global_assignment -name VERILOG_FILE sobel_3x3_rgb888.v
+set_global_assignment -name VERILOG_FILE simple_noise_filter_rgb888.v
 set_global_assignment -name VERILOG_FILE VGA.v
 set_global_assignment -name VERILOG_FILE ov7670_controller.v
 set_global_assignment -name VERILOG_FILE ov7670_capture.v
