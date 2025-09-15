@@ -1,7 +1,8 @@
 // OV7670 카메라 컨트롤러 모듈
 // 카메라의 I2C 통신을 통해 레지스터 설정을 담당하는 최상위 모듈
 module ov7670_controller (
-    input  wire       clk,              // 50MHz 시스템 클럭
+    input  wire       clk_50,           // 50MHz 시스템 클럭
+    input  wire       clk_24,           // 24MHz 시스템 클럭
     input  wire       resend,           // 설정 재시작 신호 (버튼 입력)
     output wire       config_finished,  // 설정 완료 신호 (LED 출력)
     output wire       sioc,             // I2C 클럭 신호
@@ -11,7 +12,7 @@ module ov7670_controller (
     output wire       xclk              // 카메라 클럭 신호 (25MHz)
 );
 
-    reg sys_clk = 1'b0;        // 25MHz 카메라 클럭 (50MHz에서 분주)
+    // reg sys_clk = 1'b0;        // 25MHz 카메라 클럭 (50MHz에서 분주)
     wire [15:0] command;       // I2C 명령어 (상위8비트: 레지스터주소, 하위8비트: 데이터)
     wire finished;             // 설정 완료 신호
     wire taken;                // I2C 전송 완료 신호
@@ -24,16 +25,16 @@ module ov7670_controller (
     assign send = ~finished;            // 설정이 완료되지 않았을 때만 전송 시작
     assign reset = 1'b1;                // 카메라를 정상 모드로 설정 (리셋 비활성화)
     assign pwdn = 1'b0;                 // 카메라 파워업 (파워다운 비활성화)
-    assign xclk = sys_clk;              // 25MHz 클럭을 카메라에 공급
+    assign xclk = clk_24;              // 24MHz 클럭을 카메라에 공급
     
-    // 카메라 클럭 생성 (50MHz에서 25MHz로 분주)
-    always @(posedge clk) begin
-        sys_clk <= ~sys_clk;  // 매 클럭마다 반전하여 25MHz 생성
-    end
+    // // 카메라 클럭 생성 (50MHz에서 25MHz로 분주)
+    // always @(posedge clk) begin
+    //     sys_clk <= ~sys_clk;  // 매 클럭마다 반전하여 25MHz 생성
+    // end
     
     // I2C 송신기 인스턴스 - 실제 I2C 통신을 담당
     i2c_sender i2c_inst (
-        .clk(clk),                    // 50MHz 클럭
+        .clk_50(clk_50),              // 50MHz 클럭
         .taken(taken),                // I2C 전송 완료 신호
         .siod(siod),                  // I2C 데이터 라인
         .sioc(sioc),                  // I2C 클럭 라인
@@ -45,9 +46,9 @@ module ov7670_controller (
     
     // 레지스터 설정 인스턴스 - 카메라 레지스터 설정 시퀀스 관리
     ov7670_registers reg_inst (
-        .clk(clk),                    // 50MHz 클럭
+        .clk_50(clk_50),              // 50MHz 클럭
         .advance(taken),              // I2C 전송 완료 시 다음 레지스터로 진행
-        .command(command),             // 현재 설정할 레지스터 명령어
+        .command(command),            // 현재 설정할 레지스터 명령어
         .finished(finished),          // 모든 레지스터 설정 완료 신호
         .resend(resend)               // 설정 재시작 신호
     );
@@ -56,7 +57,7 @@ endmodule
 
 // I2C 송신기 모듈 - I2C 프로토콜을 구현하여 카메라와 통신
 module i2c_sender (
-    input  wire       clk,        // 50MHz 클럭
+    input  wire       clk_50,     // 50MHz 클럭
     inout  wire       siod,       // I2C 데이터 라인 (양방향)
     output reg        sioc,       // I2C 클럭 라인
     output reg        taken,      // 전송 완료 신호
@@ -75,7 +76,7 @@ module i2c_sender (
                    (busy_sr[20:19] == 2'b10) || 
                    (busy_sr[29:28] == 2'b10)) ? 1'bZ : data_sr[31];
     
-    always @(posedge clk) begin
+    always @(posedge clk_50) begin
         taken <= 1'b0;  // 전송 완료 신호 초기화
         
         // I2C 전송이 비활성 상태일 때
@@ -120,7 +121,7 @@ endmodule
 
 // OV7670 레지스터 설정 모듈 - 카메라 초기화를 위한 레지스터 값들을 순차적으로 제공
 module ov7670_registers (
-    input  wire        clk,        // 50MHz 클럭
+    input  wire        clk_50,     // 50MHz 클럭
     input  wire        resend,     // 설정 재시작 신호
     input  wire        advance,    // 다음 레지스터로 진행 신호
     output reg  [15:0] command,    // 현재 설정할 레지스터 명령어
@@ -131,7 +132,7 @@ module ov7670_registers (
     
     assign finished = (command == 16'hFFFF);  // 0xFFFF이면 설정 완료
     
-    always @(posedge clk) begin
+    always @(posedge clk_50) begin
         // 주소 관리
         if (resend) begin
             address <= 8'h00;  // 재시작 시 첫 번째 레지스터부터 시작

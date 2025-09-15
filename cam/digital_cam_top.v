@@ -31,7 +31,7 @@ module digital_cam_top (
 );
 
     // 내부 신호들
-    wire clk_50_camera;  // 카메라용 50MHz 클럭
+    wire clk_24_camera;  // 카메라용 24MHz 클럭
     wire clk_25_vga;     // VGA용 25MHz 클럭
     wire wren;           // RAM 쓰기 활성화
     wire resend;         // 카메라 설정 재시작
@@ -205,8 +205,9 @@ module digital_cam_top (
     // 입력: 50MHz, 출력 c0: 50MHz, c1: 25MHz
     my_altpll pll_inst (
         .inclk0(clk_50),           // 50MHz 입력 클럭
-        .c0(clk_50_camera),        // 카메라용 50MHz 클럭
+        .c0(clk_24_camera),        // 카메라용 24MHz 클럭
         .c1(clk_25_vga)            // VGA용 25MHz 클럭
+
     );
     
     // VGA 컨트롤러
@@ -222,7 +223,8 @@ module digital_cam_top (
     
     // OV7670 카메라 컨트롤러
     ov7670_controller camera_ctrl (
-        .clk(clk_50_camera),       // 50MHz 카메라 클럭
+        .clk_50(clk_50),           // 50MHz 카메라 클럭
+        .clk_24(clk_24_camera),    // 24MHz 카메라 클럭
         .resend(resend),           // 설정 재시작
         .config_finished(led_config_finished),  // 설정 완료 LED
         .sioc(ov7670_sioc),        // I2C 클럭
