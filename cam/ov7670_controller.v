@@ -71,7 +71,7 @@ module i2c_sender (
     reg [31:0] busy_sr = 32'h0;        // I2C 상태 시프트 레지스터
     reg [31:0] data_sr = 32'hFFFFFFFF; // I2C 데이터 시프트 레지스터
     
-    // SIOD 트라이스테이트 제어 - I2C 데이터 라인의 출력/입력 제어
+    // SIOD 트라이스테이트 제어 - I2C 데이터 라인의 출력/입력 제어 , ACK 신호 판단
     assign siod = ((busy_sr[11:10] == 2'b10) || 
                    (busy_sr[20:19] == 2'b10) || 
                    (busy_sr[29:28] == 2'b10)) ? 1'bZ : data_sr[31];
