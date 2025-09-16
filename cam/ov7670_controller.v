@@ -12,7 +12,6 @@ module ov7670_controller (
     output wire       xclk              // 카메라 클럭 신호 (25MHz)
 );
 
-    // reg sys_clk = 1'b0;        // 25MHz 카메라 클럭 (50MHz에서 분주)
     wire [15:0] command;       // I2C 명령어 (상위8비트: 레지스터주소, 하위8비트: 데이터)
     wire finished;             // 설정 완료 신호
     wire taken;                // I2C 전송 완료 신호
@@ -26,11 +25,6 @@ module ov7670_controller (
     assign reset = 1'b1;                // 카메라를 정상 모드로 설정 (리셋 비활성화)
     assign pwdn = 1'b0;                 // 카메라 파워업 (파워다운 비활성화)
     assign xclk = clk_24;              // 24MHz 클럭을 카메라에 공급
-    
-    // // 카메라 클럭 생성 (50MHz에서 25MHz로 분주)
-    // always @(posedge clk) begin
-    //     sys_clk <= ~sys_clk;  // 매 클럭마다 반전하여 25MHz 생성
-    // end
     
     // I2C 송신기 인스턴스 - 실제 I2C 통신을 담당
     i2c_sender i2c_inst (

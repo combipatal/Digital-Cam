@@ -27,10 +27,10 @@ module sobel_3x3_rgb888 (
     wire [23:0] p10, p11, p12;  // 두 번째 줄
     wire [23:0] p20, p21, p22;  // 세 번째 줄
     
-    // RGB888 그레이스케일 변환 함수
+    // RGB888 그레이스케일 변환 함수 (개선된 정확도)
     function [7:0] rgb888_to_gray;
         input [23:0] rgb888;
-        reg [8:0] temp_sum;
+        reg [10:0] temp_sum;  // 더 큰 비트폭으로 정확도 향상
         reg [7:0] r, g, b;
         begin
             // RGB888에서 RGB 추출
@@ -38,12 +38,18 @@ module sobel_3x3_rgb888 (
             g = rgb888[15:8];
             b = rgb888[7:0];
             
-            // Y = 0.299*R + 0.587*G + 0.114*B (근사값)
-            // Y = (R + 2*G + B) / 4
-            temp_sum = r + g + g + b;
-            rgb888_to_gray = temp_sum[8:2];  // >> 2 (4로 나누기)
+            // Y = 0.299*R + 0.587*G + 0.114*B (ITU-R BT.709 표준)
+            // 더 정확한 정수 연산: Y = (76*R + 150*G + 30*B) / 256
+            // 76/256 ≈ 0.2969, 150/256 ≈ 0.5859, 30/256 ≈ 0.1172
+            temp_sum = (r << 6) + (r << 3) + (r << 2);  // 76*R = 64*R + 8*R + 4*R
+            temp_sum = temp_sum + (g << 7) + (g << 4) + (g << 2) + (g << 1);  // 150*G = 128*G + 16*G + 4*G + 2*G
+            temp_sum = temp_sum + (b << 4) + (b << 3) + (b << 1);  // 30*B = 16*B + 8*B + 2*B
+            
+            rgb888_to_gray = temp_sum[10:3];  // >> 3 (8로 나누기, 256/8=32)
         end
     endfunction
+    
+    // 가우시안 필터는 별도 모듈에서 처리되므로 제거
     
     // 3x3 윈도우 출력 (세로줄 노이즈 제거)
     reg [23:0] p00_r, p01_r, p02_r, p10_r, p11_r, p12_r, p20_r, p21_r, p22_r;
@@ -114,53 +120,47 @@ module sobel_3x3_rgb888 (
     // VSYNC 리셋 제어
     reg vsync_prev;
     reg reset_done;
+    reg [2:0] init_counter;  // 초기화 카운터 (0-4)
     
     // VSYNC 상승 에지 감지
     always @(posedge clk) begin
         vsync_prev <= vsync;
     end
     
-    // 캐시 시프트
-    reg [1:0] init_state;
-    
+    // 캐시 시프트 및 초기화
     always @(posedge clk) begin
         if (vsync && !vsync_prev) begin
             // VSYNC 상승 에지에서 리셋
             reset_done <= 1'b0;
-            init_state <= 2'b00;
+            init_counter <= 3'd0;
             cache1[0] <= 24'h000000; cache1[1] <= 24'h000000; cache1[2] <= 24'h000000;
             cache2[0] <= 24'h000000; cache2[1] <= 24'h000000; cache2[2] <= 24'h000000;
             cache3[0] <= 24'h000000; cache3[1] <= 24'h000000; cache3[2] <= 24'h000000;
         end else if (valid_addr && active_area) begin
             if (!reset_done) begin
-                // 초기화 단계별 처리
-                case (init_state)
-                    2'b00: begin
-                        // 첫 번째 줄 초기화
-                        cache1[0] <= 24'h000000; cache1[1] <= 24'h000000; cache1[2] <= 24'h000000;
-                        cache2[0] <= 24'h000000; cache2[1] <= pixel_in; cache2[2] <= 24'h000000;
-                        cache3[0] <= 24'h000000; cache3[1] <= 24'h000000; cache3[2] <= 24'h000000;
-                        init_state <= 2'b01;
-                    end
-                    2'b01: begin
-                        // 두 번째 줄 초기화
-                        cache1[0] <= 24'h000000; cache1[1] <= 24'h000000; cache1[2] <= 24'h000000;
-                        cache2[0] <= cache2[1]; cache2[1] <= cache2[2]; cache2[2] <= pixel_in;
-                        cache3[0] <= 24'h000000; cache3[1] <= 24'h000000; cache3[2] <= 24'h000000;
-                        init_state <= 2'b10;
-                    end
-                    2'b10: begin
-                        // 세 번째 줄 초기화 완료
-                        cache1[0] <= 24'h000000; cache1[1] <= 24'h000000; cache1[2] <= 24'h000000;
-                        cache2[0] <= cache2[1]; cache2[1] <= cache2[2]; cache2[2] <= cache3[1];
-                        cache3[0] <= 24'h000000; cache3[1] <= 24'h000000; cache3[2] <= pixel_in;
-                        reset_done <= 1'b1;
-                        init_state <= 2'b11;
-                    end
-                    default: begin
-                        reset_done <= 1'b1;
-                    end
-                endcase
+                // 초기화 단계별 처리 - 6클럭에 걸쳐 안정적으로 초기화
+                if (init_counter < 3'd5) begin
+                    init_counter <= init_counter + 1'b1;
+                    // 초기화 중에는 캐시를 0으로 유지
+                    cache1[0] <= 24'h000000; cache1[1] <= 24'h000000; cache1[2] <= 24'h000000;
+                    cache2[0] <= 24'h000000; cache2[1] <= 24'h000000; cache2[2] <= 24'h000000;
+                    cache3[0] <= 24'h000000; cache3[1] <= 24'h000000; cache3[2] <= 24'h000000;
+                end else begin
+                    // 초기화 완료 - 7클럭째부터 정상 동작 (3x3 윈도우 완성)
+                    reset_done <= 1'b1;
+                    // 정상 시프트
+                    cache1[0] <= cache1[1];
+                    cache1[1] <= cache1[2];
+                    cache1[2] <= cache2[1];
+                    
+                    cache2[0] <= cache2[1];
+                    cache2[1] <= cache2[2];
+                    cache2[2] <= cache3[1];
+                    
+                    cache3[0] <= cache3[1];
+                    cache3[1] <= cache3[2];
+                    cache3[2] <= pixel_in;
+                end
             end else begin
                 // 정상 동작 - 시프트
                 cache1[0] <= cache1[1];
@@ -197,6 +197,8 @@ module sobel_3x3_rgb888 (
         end
     end
     
+    // 가우시안 필터링은 별도 모듈에서 처리되므로 제거
+    
     // 소벨 계산
     reg [9:0] gx_sum, gy_sum;
     reg [9:0] gx_abs, gy_abs;
@@ -212,8 +214,9 @@ module sobel_3x3_rgb888 (
             edge_threshold <= 11'd25;
             noise_threshold <= 11'd12;
             
-            if (y_pos > 1 && x_pos > 1 && y_pos < 238 && x_pos < 318) begin
-                // 정상 3x3 윈도우 영역
+            // 더 엄격한 경계 조건 - 왼쪽 경계에서 노이즈 제거
+            if (y_pos > 2 && x_pos > 2 && y_pos < 237 && x_pos < 317) begin
+                // 정상 3x3 윈도우 영역 (원본 그레이스케일 값 사용)
                 gx_sum <= g02 + (g12 << 1) + g22 - g00 - (g10 << 1) - g20;
                 gy_sum <= g20 + (g21 << 1) + g22 - g00 - (g01 << 1) - g02;
                 
@@ -234,16 +237,17 @@ module sobel_3x3_rgb888 (
                 end
                 sobel_ready <= 1'b1;
                 
-            end else if (y_pos > 0 && x_pos > 0 && y_pos < 239 && x_pos < 319) begin
-                // 경계 영역
+            end else if (y_pos > 1 && x_pos > 1 && y_pos < 238 && x_pos < 318) begin
+                // 경계 영역 - 원본 그레이스케일 값으로 단순한 차이 기반 엣지 검출
                 simple_edge = (g11 > g10) ? (g11 - g10) : (g10 - g11);
                 simple_edge = simple_edge + ((g11 > g01) ? (g11 - g01) : (g01 - g11));
                 simple_edge = simple_edge + ((g11 > g12) ? (g11 - g12) : (g12 - g11));
                 simple_edge = simple_edge + ((g11 > g21) ? (g11 - g21) : (g21 - g11));
                 
-                if (simple_edge > 8'd40) begin
+                // 경계 영역에서는 더 높은 임계값 사용
+                if (simple_edge > 8'd60) begin
                     sobel_value_temp <= 8'hFF;
-                end else if (simple_edge > 8'd20) begin
+                end else if (simple_edge > 8'd30) begin
                     sobel_value_temp <= simple_edge;
                 end else begin
                     sobel_value_temp <= 8'h00;
@@ -251,6 +255,7 @@ module sobel_3x3_rgb888 (
                 sobel_ready <= 1'b1;
                 
             end else begin
+                // 가장자리 영역에서는 검은색 출력
                 sobel_value_temp <= 8'h00;
                 sobel_ready <= 1'b0;
             end
@@ -260,20 +265,24 @@ module sobel_3x3_rgb888 (
         end
     end
     
-    // 출력 처리
+    // 출력 처리 - 초기화 중에는 검은색 출력
     always @(posedge clk) begin
         if (enable && reset_done && valid_addr && active_area && sobel_ready) begin
+            // 더 강한 엣지 강화 - 노이즈 제거
             if (sobel_value_temp == 8'hFF) begin
                 sobel_value <= 8'hFF;
-            end else if (sobel_value_temp > 8'd200) begin
+            end else if (sobel_value_temp > 8'd180) begin
                 sobel_value <= 8'hFF;
-            end else if (sobel_value_temp > 8'd100) begin
-                sobel_value <= sobel_value_temp;
-            end else if (sobel_value_temp > 8'd50) begin
+            end else if (sobel_value_temp > 8'd120) begin
+                sobel_value <= sobel_value_temp + 8'd30;  // 더 강한 강화
+            end else if (sobel_value_temp > 8'd80) begin
                 sobel_value <= sobel_value_temp + 8'd20;
             end else begin
-                sobel_value <= 8'h00;
+                sobel_value <= 8'h00;  // 낮은 값은 완전히 제거
             end
+        end else if (!reset_done || !valid_addr || !active_area) begin
+            // 초기화 중이거나 유효하지 않은 영역에서는 검은색 출력
+            sobel_value <= 8'h00;
         end else begin
             sobel_value <= 8'h00;
         end

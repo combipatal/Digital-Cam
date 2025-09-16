@@ -33,7 +33,7 @@ module gaussian_3x3_rgb888 (
     // VSYNC 리셋 제어
     reg vsync_prev;
     reg reset_done;
-    reg [1:0] init_state;
+    reg [2:0] init_counter;  // 초기화 카운터 (0-4)
 
     always @(posedge clk) begin
         vsync_prev <= vsync;
@@ -87,50 +87,50 @@ module gaussian_3x3_rgb888 (
     assign p10 = p10_r; assign p11 = p11_r; assign p12 = p12_r;
     assign p20 = p20_r; assign p21 = p21_r; assign p22 = p22_r;
 
-    // 캐시 시프트 (sobel과 동일한 방식)
+    // 캐시 시프트 및 초기화 (소벨 필터와 동일한 방식)
     always @(posedge clk) begin
         if (vsync && !vsync_prev) begin
+            // VSYNC 상승 에지에서 리셋
             reset_done <= 1'b0;
-            init_state <= 2'b00;
+            init_counter <= 3'd0;
             cache1[0] <= 24'h000000; cache1[1] <= 24'h000000; cache1[2] <= 24'h000000;
             cache2[0] <= 24'h000000; cache2[1] <= 24'h000000; cache2[2] <= 24'h000000;
             cache3[0] <= 24'h000000; cache3[1] <= 24'h000000; cache3[2] <= 24'h000000;
         end else if (valid_addr && active_area) begin
             if (!reset_done) begin
-                case (init_state)
-                    2'b00: begin
-                        cache1[0] <= 24'h000000; cache1[1] <= 24'h000000; cache1[2] <= 24'h000000;
-                        cache2[0] <= 24'h000000; cache2[1] <= pixel_in;  cache2[2] <= 24'h000000;
-                        cache3[0] <= 24'h000000; cache3[1] <= 24'h000000; cache3[2] <= 24'h000000;
-                        init_state <= 2'b01;
-                    end
-                    2'b01: begin
-                        cache1[0] <= 24'h000000; cache1[1] <= 24'h000000; cache1[2] <= 24'h000000;
-                        cache2[0] <= cache2[1]; cache2[1] <= cache2[2]; cache2[2] <= pixel_in;
-                        cache3[0] <= 24'h000000; cache3[1] <= 24'h000000; cache3[2] <= 24'h000000;
-                        init_state <= 2'b10;
-                    end
-                    2'b10: begin
-                        cache1[0] <= 24'h000000; cache1[1] <= 24'h000000; cache1[2] <= 24'h000000;
-                        cache2[0] <= cache2[1]; cache2[1] <= cache2[2]; cache2[2] <= cache3[1];
-                        cache3[0] <= 24'h000000; cache3[1] <= 24'h000000; cache3[2] <= pixel_in;
-                        reset_done <= 1'b1;
-                        init_state <= 2'b11;
-                    end
-                    default: begin
-                        reset_done <= 1'b1;
-                    end
-                endcase
+                // 초기화 단계별 처리 - 6클럭에 걸쳐 안정적으로 초기화
+                if (init_counter < 3'd5) begin
+                    init_counter <= init_counter + 1'b1;
+                    // 초기화 중에는 캐시를 0으로 유지
+                    cache1[0] <= 24'h000000; cache1[1] <= 24'h000000; cache1[2] <= 24'h000000;
+                    cache2[0] <= 24'h000000; cache2[1] <= 24'h000000; cache2[2] <= 24'h000000;
+                    cache3[0] <= 24'h000000; cache3[1] <= 24'h000000; cache3[2] <= 24'h000000;
+                end else begin
+                    // 초기화 완료 - 7클럭째부터 정상 동작 (3x3 윈도우 완성)
+                    reset_done <= 1'b1;
+                    // 정상 시프트
+                    cache1[0] <= cache1[1];
+                    cache1[1] <= cache1[2];
+                    cache1[2] <= cache2[1];
+                    
+                    cache2[0] <= cache2[1];
+                    cache2[1] <= cache2[2];
+                    cache2[2] <= cache3[1];
+                    
+                    cache3[0] <= cache3[1];
+                    cache3[1] <= cache3[2];
+                    cache3[2] <= pixel_in;
+                end
             end else begin
-                // 정상 시프트
+                // 정상 동작 - 시프트
                 cache1[0] <= cache1[1];
                 cache1[1] <= cache1[2];
                 cache1[2] <= cache2[1];
-
+                
                 cache2[0] <= cache2[1];
                 cache2[1] <= cache2[2];
                 cache2[2] <= cache3[1];
-
+                
                 cache3[0] <= cache3[1];
                 cache3[1] <= cache3[2];
                 cache3[2] <= pixel_in;
@@ -154,13 +154,23 @@ module gaussian_3x3_rgb888 (
     reg [11:0] r_sum, g_sum, b_sum; // 최대 16*255=4080 < 4096
     reg [7:0]  r_blur, g_blur, b_blur;
 
+    // 가우시안 연산 (1클럭)
     always @(posedge clk) begin
         if (enable && reset_done && valid_addr && active_area) begin
             // (1 2 1; 2 4 2; 1 2 1) 합산
             r_sum <= (r00 + r02 + r20 + r22) + ((r01 + r10 + r12 + r21) << 1) + (r11 << 2);
             g_sum <= (g00 + g02 + g20 + g22) + ((g01 + g10 + g12 + g21) << 1) + (g11 << 2);
             b_sum <= (b00 + b02 + b20 + b22) + ((b01 + b10 + b12 + b21) << 1) + (b11 << 2);
-
+        end else begin
+            r_sum <= 12'h000;
+            g_sum <= 12'h000;
+            b_sum <= 12'h000;
+        end
+    end
+    
+    // 정규화 및 출력 (1클럭)
+    always @(posedge clk) begin
+        if (enable && reset_done && valid_addr && active_area) begin
             // 정규화 (/16)
             r_blur <= r_sum[11:4];
             g_blur <= g_sum[11:4];

@@ -99,8 +99,8 @@ module digital_cam_top (
     // RGB 변환 및 그레이스케일, 소벨 필터, 디지털 필터 모드
     wire [7:0] gray_value;           // 그레이스케일 값
     wire [7:0] red_value, green_value, blue_value;  // RGB 값들
-    wire [7:0] sobel_value;          // 소벨 필터 값
-    wire [23:0] filtered_pixel;      // 디지털 필터 적용된 픽셀 (RGB888)
+    wire [7:0] sobel_value;          // 소벨 필터 값 (그레이스케일)
+    wire [23:0] filtered_pixel;      // 디지털 필터 적용된 픽셀 (RGB888) - 그레이 복제
     wire filter_ready;               // 필터 처리 완료 신호
     wire sobel_ready;                // 소벨 처리 완료 신호 (선언을 앞당겨 사용 이전에 배치)
     
@@ -109,41 +109,43 @@ module digital_cam_top (
     // RGB888: R[7:0] G[7:0] B[7:0]
     wire [7:0] r_888, g_888, b_888;  // RGB888로 확장된 값들
     
-    assign r_888 = {rddata[15:11], 3'b000};  // 5비트 → 8비트 (x8)
-    assign g_888 = {rddata[10:5], 2'b00};    // 6비트 → 8비트 (x4)
-    assign b_888 = {rddata[4:0], 3'b000};    // 5비트 → 8비트 (x8)
+    assign r_888 = {rddata[15:11], 3'b111};  // 5비트 → 8비트 (x8 + 7) - 더 밝게
+    assign g_888 = {rddata[10:5], 2'b11};    // 6비트 → 8비트 (x4 + 3) - 더 밝게
+    assign b_888 = {rddata[4:0], 3'b111};    // 5비트 → 8비트 (x8 + 7) - 더 밝게
     
     // RGB888을 하나의 24비트 픽셀로 결합 (필터 입력용)
     wire [23:0] rgb888_pixel = {r_888, g_888, b_888};
     
-    // 그레이스케일 계산 (RGB888 기준)
-    wire [8:0] gray_sum;             // 그레이스케일 합계
-    assign gray_sum = r_888 + g_888 + g_888 + b_888;  // R + 2*G + B
-    assign gray_value = activeArea ? gray_sum[8:2] : 8'h00;  // >> 2 (4로 나누기)
+    // 그레이스케일 계산 (RGB888 기준) - 개선된 정확도
+    wire [10:0] gray_sum;            // 그레이스케일 합계 (더 큰 비트폭)
+    // Y = 0.299*R + 0.587*G + 0.114*B (ITU-R BT.709 표준)
+    // 더 정확한 정수 연산: Y = (76*R + 150*G + 30*B) / 256
+    assign gray_sum = (r_888 << 6) + (r_888 << 3) + (r_888 << 2) +  // 76*R
+                     (g_888 << 7) + (g_888 << 4) + (g_888 << 2) + (g_888 << 1) +  // 150*G
+                     (b_888 << 4) + (b_888 << 3) + (b_888 << 1);  // 30*B
+    assign gray_value = activeArea ? gray_sum[10:3] : 8'h00;  // >> 3 (8로 나누기)
     
-    // 필터 적용된 픽셀에서 RGB 분리 (RGB888 직접 사용)
-    wire [7:0] filter_r_888, filter_g_888, filter_b_888;
-    assign filter_r_888 = filtered_pixel[23:16];  // R 채널
-    assign filter_g_888 = filtered_pixel[15:8];   // G 채널
-    assign filter_b_888 = filtered_pixel[7:0];    // B 채널
+    // 가우시안 필터는 소벨 필터 내부에서 처리되므로 이 변수들은 사용하지 않음
     
-    // 통합 파이프라인 지연 (가변 인덱스로 최종 정렬 손쉽게 조정)
-    localparam integer PIPE_IDX = 5; // 필요시 4~7 사이로 조정
-    reg [16:0] rdaddress_delayed [6:0];
-    reg activeArea_delayed [6:0];
-    reg [7:0] sobel_value_delayed [6:0];
-    reg [7:0] red_value_delayed [6:0], green_value_delayed [6:0], blue_value_delayed [6:0];
-    reg [7:0] gray_value_delayed [6:0];
-    reg [23:0] filtered_pixel_delayed [6:0];
-    reg [7:0] filter_r_delayed [6:0], filter_g_delayed [6:0], filter_b_delayed [6:0];
+    // 파이프라인 지연: 정상 상태 총 4클럭 (가우시안 2 + 소벨 2)
+    localparam integer PIPE_LATENCY = 4;                // pipeline latency
+    reg [16:0] rdaddress_delayed [PIPE_LATENCY:0];      // rdaddress delayed value
+    reg activeArea_delayed [PIPE_LATENCY:0];            // active area delayed value
+    reg [7:0] red_value_delayed [PIPE_LATENCY:0];       // red delayed value
+    reg [7:0] green_value_delayed [PIPE_LATENCY:0];     // green delayed value
+    reg [7:0] blue_value_delayed [PIPE_LATENCY:0];      // blue delayed value
+    reg [7:0] gray_value_delayed [PIPE_LATENCY:0];      // gray delayed value
+    reg [23:0] filtered_pixel_delayed [PIPE_LATENCY:0]; // filtered pixel delayed value
+    reg [7:0] filter_r_delayed [PIPE_LATENCY:0];        // filter r delayed value
+    reg [7:0] filter_g_delayed [PIPE_LATENCY:0];        // filter g delayed value
+    reg [7:0] filter_b_delayed [PIPE_LATENCY:0];        // filter b delayed value
     integer i; 
     
-	 // 7클럭 통합 지연
+	 // 파이프라인 정렬: 정상 상태 기준 PIPE_LATENCY 클럭 지연 체인
     always @(posedge clk_25_vga) begin
         // 0단계
         rdaddress_delayed[0] <= rdaddress;
         activeArea_delayed[0] <= activeArea;
-        sobel_value_delayed[0] <= sobel_value;
         red_value_delayed[0] <= red_value;
         green_value_delayed[0] <= green_value;
         blue_value_delayed[0] <= blue_value;
@@ -153,11 +155,10 @@ module digital_cam_top (
         filter_g_delayed[0] <= filter_g_888;
         filter_b_delayed[0] <= filter_b_888;
         
-        // 1-6단계
-        for (i= 1; i <= 6; i = i + 1) begin
+        // 1-PIPE_LATENCY 단계 지연 체인
+        for (i= 1; i <= PIPE_LATENCY; i = i + 1) begin
             rdaddress_delayed[i] <= rdaddress_delayed[i-1];
             activeArea_delayed[i] <= activeArea_delayed[i-1];
-            sobel_value_delayed[i] <= sobel_value_delayed[i-1];
             red_value_delayed[i] <= red_value_delayed[i-1];
             green_value_delayed[i] <= green_value_delayed[i-1];
             blue_value_delayed[i] <= blue_value_delayed[i-1];
@@ -169,16 +170,29 @@ module digital_cam_top (
         end
     end
 
-    // 소벨 엣지 검출 필터 (RGB888용) - 원본 입력 사용
-    sobel_3x3_rgb888 sobel_inst (
-        .clk(clk_25_vga),            // 25MHz VGA 클럭
-        .enable(sw_sobel),           // SW1로 소벨 필터 활성화
-        .pixel_in(rgb888_pixel),     // 원본 RGB888 입력
-        .pixel_addr(rdaddress),      // 픽셀 주소
-        .vsync(vSync),               // 수직 동기화
-        .active_area(activeArea),    // 활성 영역 신호
-        .sobel_value(sobel_value),   // 소벨 필터 값
-        .sobel_ready(sobel_ready)    // 필터 처리 완료 신호
+    // 가우시안 블러 (그레이스케일 8비트)
+    wire [7:0] gray_blur;
+    gaussian_3x3_gray8 filter_inst (
+        .clk(clk_25_vga),
+        .enable(1'b1),
+        .pixel_in(gray_value),
+        .pixel_addr(rdaddress),
+        .vsync(vSync),
+        .active_area(activeArea),
+        .pixel_out(gray_blur),
+        .filter_ready(filter_ready)
+    );
+
+    // 소벨 엣지 검출 (그레이스케일 8비트) - 가우시안 결과 입력
+    sobel_3x3_gray8 sobel_inst (
+        .clk(clk_25_vga),
+        .enable(1'b1),
+        .pixel_in(gray_blur),
+        .pixel_addr(rdaddress),
+        .vsync(vSync),
+        .active_area(activeArea),
+        .pixel_out(sobel_value),
+        .sobel_ready(sobel_ready)
     );
     
     // 색상 값들 - RGB888 직접 사용
@@ -186,32 +200,31 @@ module digital_cam_top (
     assign green_value = activeArea ? g_888 : 8'h00;
     assign blue_value = activeArea ? b_888 : 8'h00;
     
-    // 가우시안 블러 필터 인스턴스 (RGB888용) - 항상 계산, SW2는 화면 선택만 담당
-    gaussian_3x3_rgb888 filter_inst (
-        .clk(clk_25_vga),            // 25MHz VGA 클럭
-        .enable(1'b1),                // 항상 동작
-        .pixel_in(rgb888_pixel),      // RGB888 픽셀 데이터
-        .pixel_addr(rdaddress),       // 픽셀 주소
-        .vsync(vSync),                // 수직 동기화
-        .active_area(activeArea),     // 활성 영역 신호
-        .pixel_out(filtered_pixel),   // 필터 적용된 픽셀 (RGB888)
-        .filter_ready(filter_ready)   // 필터 처리 완료 신호
-    );
+    // 그레이스케일 필터 + 가우시안 필터 적용된 픽셀
+    assign filtered_pixel = {gray_blur, gray_blur, gray_blur};
     
     // 스위치에 따른 출력 선택
     wire [7:0] final_r, final_g, final_b;
-    wire [7:0] filter_r, filter_g, filter_b;
     
-    // 우선순위: 소벨 > 그레이스케일 > 디지털 필터 > 원본 (가변 지연 인덱스 적용)
-    assign final_r = sw_sobel ? sobel_value_delayed[PIPE_IDX] : 
-                     (sw_grayscale ? gray_value_delayed[PIPE_IDX] : 
-                      (sw_filter ? filter_r_delayed[PIPE_IDX] : red_value_delayed[PIPE_IDX]));
-    assign final_g = sw_sobel ? sobel_value_delayed[PIPE_IDX] : 
-                     (sw_grayscale ? gray_value_delayed[PIPE_IDX] : 
-                      (sw_filter ? filter_g_delayed[PIPE_IDX] : green_value_delayed[PIPE_IDX]));
-    assign final_b = sw_sobel ? sobel_value_delayed[PIPE_IDX] : 
-                     (sw_grayscale ? gray_value_delayed[PIPE_IDX] : 
-                      (sw_filter ? filter_b_delayed[PIPE_IDX] : blue_value_delayed[PIPE_IDX]));
+    // 필터 적용된 픽셀에서 RGB 분리 (가우시안 그레이 결과 복제)
+    wire [7:0] filter_r_888, filter_g_888, filter_b_888;
+    assign filter_r_888 = filtered_pixel[23:16];  // R 채널
+    assign filter_g_888 = filtered_pixel[15:8];   // G 채널
+    assign filter_b_888 = filtered_pixel[7:0];    // B 채널
+    
+    // 우선순위: 소벨(가우시안 전처리) > 그레이스케일 > 가우시안 필터 > 원본
+    // 정렬 원칙: 최종 출력 시점은 주소 등 기준 신호를 PIPE_IDX만큼 지연시킨 시점
+    // - 소벨은 내부 파이프라인 지연이 STEADY_LATENCY(현재 3클럭)이므로 추가 지연은 PIPE_IDX-STEADY_LATENCY만 적용
+    // 최종 출력 선택: 소벨은 원본(sobel_value) 사용, 나머지는 PIPE_LATENCY 정렬 사용
+    assign final_r = sw_sobel ? sobel_value : 
+                     (sw_grayscale ? gray_value_delayed[PIPE_LATENCY] : 
+                      (sw_filter ? filter_r_delayed[PIPE_LATENCY] : red_value_delayed[PIPE_LATENCY]));
+    assign final_g = sw_sobel ? sobel_value : 
+                     (sw_grayscale ? gray_value_delayed[PIPE_LATENCY] : 
+                      (sw_filter ? filter_g_delayed[PIPE_LATENCY] : green_value_delayed[PIPE_LATENCY]));
+    assign final_b = sw_sobel ? sobel_value : 
+                     (sw_grayscale ? gray_value_delayed[PIPE_LATENCY] : 
+                      (sw_filter ? filter_b_delayed[PIPE_LATENCY] : blue_value_delayed[PIPE_LATENCY]));
     
     // VGA 출력 연결
     assign vga_r = final_r;

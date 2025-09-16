@@ -1,0 +1,240 @@
+#! /opt/homebrew/Cellar/icarus-verilog/12.0/bin/vvp
+:ivl_version "12.0 (stable)";
+:ivl_delay_selection "TYPICAL";
+:vpi_time_precision + 0;
+:vpi_module "/opt/homebrew/Cellar/icarus-verilog/12.0/lib/ivl/system.vpi";
+:vpi_module "/opt/homebrew/Cellar/icarus-verilog/12.0/lib/ivl/vhdl_sys.vpi";
+:vpi_module "/opt/homebrew/Cellar/icarus-verilog/12.0/lib/ivl/vhdl_textio.vpi";
+:vpi_module "/opt/homebrew/Cellar/icarus-verilog/12.0/lib/ivl/v2005_math.vpi";
+:vpi_module "/opt/homebrew/Cellar/icarus-verilog/12.0/lib/ivl/va_math.vpi";
+:vpi_module "/opt/homebrew/Cellar/icarus-verilog/12.0/lib/ivl/v2009.vpi";
+S_0x1054efa30 .scope package, "$unit" "$unit" 2 1;
+ .timescale 0 0;
+S_0x1054e84b0 .scope module, "i2c_sender" "i2c_sender" 3 59;
+ .timescale 0 0;
+    .port_info 0 /INPUT 1 "clk_50";
+    .port_info 1 /INOUT 1 "siod";
+    .port_info 2 /OUTPUT 1 "sioc";
+    .port_info 3 /OUTPUT 1 "taken";
+    .port_info 4 /INPUT 1 "send";
+    .port_info 5 /INPUT 8 "id";
+    .port_info 6 /INPUT 8 "data";
+    .port_info 7 /INPUT 8 "value";
+L_0x88103dc70 .functor OR 1, L_0x880c58820, L_0x880c588c0, C4<0>, C4<0>;
+L_0x88103dce0 .functor OR 1, L_0x88103dc70, L_0x880c58960, C4<0>, C4<0>;
+v0x1054efbb0_0 .net *"_ivl_1", 1 0, L_0x1054f3fe0;  1 drivers
+v0x1054e8630_0 .net *"_ivl_10", 0 0, L_0x880c588c0;  1 drivers
+v0x1054e86d0_0 .net *"_ivl_13", 0 0, L_0x88103dc70;  1 drivers
+v0x1054eae60_0 .net *"_ivl_15", 1 0, L_0x1054f4120;  1 drivers
+L_0x8814540a0 .functor BUFT 1, C4<10>, C4<0>, C4<0>, C4<0>;
+v0x1054eaf00_0 .net/2u *"_ivl_16", 1 0, L_0x8814540a0;  1 drivers
+v0x1054eafa0_0 .net *"_ivl_18", 0 0, L_0x880c58960;  1 drivers
+L_0x881454010 .functor BUFT 1, C4<10>, C4<0>, C4<0>, C4<0>;
+v0x1054eb040_0 .net/2u *"_ivl_2", 1 0, L_0x881454010;  1 drivers
+v0x1054eb0e0_0 .net *"_ivl_21", 0 0, L_0x88103dce0;  1 drivers
+o0x881420190 .functor BUFZ 1, C4<z>; HiZ drive
+; Elide local net with no drivers, v0x1054f3d00_0 name=_ivl_22
+v0x1054f3da0_0 .net *"_ivl_25", 0 0, L_0x1054f41c0;  1 drivers
+v0x1054f3e40_0 .net *"_ivl_4", 0 0, L_0x880c58820;  1 drivers
+v0x880c58000_0 .net *"_ivl_7", 1 0, L_0x1054f4080;  1 drivers
+L_0x881454058 .functor BUFT 1, C4<10>, C4<0>, C4<0>, C4<0>;
+v0x880c580a0_0 .net/2u *"_ivl_8", 1 0, L_0x881454058;  1 drivers
+v0x880c58140_0 .var "busy_sr", 31 0;
+o0x8814202b0 .functor BUFZ 1, C4<z>; HiZ drive
+v0x880c581e0_0 .net "clk_50", 0 0, o0x8814202b0;  0 drivers
+o0x8814202e0 .functor BUFZ 8, C4<zzzzzzzz>; HiZ drive
+v0x880c58280_0 .net "data", 7 0, o0x8814202e0;  0 drivers
+v0x880c58320_0 .var "data_sr", 31 0;
+v0x880c583c0_0 .var "divider", 7 0;
+o0x881420370 .functor BUFZ 8, C4<zzzzzzzz>; HiZ drive
+v0x880c58460_0 .net "id", 7 0, o0x881420370;  0 drivers
+o0x8814203a0 .functor BUFZ 1, C4<z>; HiZ drive
+v0x880c58500_0 .net "send", 0 0, o0x8814203a0;  0 drivers
+v0x880c585a0_0 .var "sioc", 0 0;
+v0x880c58640_0 .net "siod", 0 0, L_0x1054f4260;  1 drivers
+v0x880c586e0_0 .var "taken", 0 0;
+o0x881420460 .functor BUFZ 8, C4<zzzzzzzz>; HiZ drive
+v0x880c58780_0 .net "value", 7 0, o0x881420460;  0 drivers
+E_0x880c45000 .event posedge, v0x880c581e0_0;
+L_0x1054f3fe0 .part v0x880c58140_0, 10, 2;
+L_0x880c58820 .cmp/eq 2, L_0x1054f3fe0, L_0x881454010;
+L_0x1054f4080 .part v0x880c58140_0, 19, 2;
+L_0x880c588c0 .cmp/eq 2, L_0x1054f4080, L_0x881454058;
+L_0x1054f4120 .part v0x880c58140_0, 28, 2;
+L_0x880c58960 .cmp/eq 2, L_0x1054f4120, L_0x8814540a0;
+L_0x1054f41c0 .part v0x880c58320_0, 31, 1;
+L_0x1054f4260 .functor MUXZ 1, L_0x1054f41c0, o0x881420190, L_0x88103dce0, C4<>;
+    .scope S_0x1054e84b0;
+T_0 ;
+    %pushi/vec4 1, 0, 8;
+    %store/vec4 v0x880c583c0_0, 0, 8;
+    %pushi/vec4 0, 0, 32;
+    %store/vec4 v0x880c58140_0, 0, 32;
+    %pushi/vec4 4294967295, 0, 32;
+    %store/vec4 v0x880c58320_0, 0, 32;
+    %end;
+    .thread T_0, $init;
+    .scope S_0x1054e84b0;
+T_1 ;
+    %wait E_0x880c45000;
+    %pushi/vec4 0, 0, 1;
+    %assign/vec4 v0x880c586e0_0, 0;
+    %load/vec4 v0x880c58140_0;
+    %parti/s 1, 31, 6;
+    %cmpi/e 0, 0, 1;
+    %jmp/0xz  T_1.0, 4;
+    %pushi/vec4 1, 0, 1;
+    %assign/vec4 v0x880c585a0_0, 0;
+    %load/vec4 v0x880c58500_0;
+    %cmpi/e 1, 0, 1;
+    %jmp/0xz  T_1.2, 4;
+    %load/vec4 v0x880c583c0_0;
+    %cmpi/e 0, 0, 8;
+    %jmp/0xz  T_1.4, 4;
+    %pushi/vec4 4, 0, 3;
+    %load/vec4 v0x880c58460_0;
+    %concat/vec4; draw_concat_vec4
+    %concati/vec4 0, 0, 1;
+    %load/vec4 v0x880c58280_0;
+    %concat/vec4; draw_concat_vec4
+    %concati/vec4 0, 0, 1;
+    %load/vec4 v0x880c58780_0;
+    %concat/vec4; draw_concat_vec4
+    %concati/vec4 0, 0, 1;
+    %concati/vec4 1, 0, 2;
+    %assign/vec4 v0x880c58320_0, 0;
+    %pushi/vec4 4294967295, 0, 32;
+    %assign/vec4 v0x880c58140_0, 0;
+    %pushi/vec4 1, 0, 1;
+    %assign/vec4 v0x880c586e0_0, 0;
+    %jmp T_1.5;
+T_1.4 ;
+    %load/vec4 v0x880c583c0_0;
+    %addi 1, 0, 8;
+    %assign/vec4 v0x880c583c0_0, 0;
+T_1.5 ;
+T_1.2 ;
+    %jmp T_1.1;
+T_1.0 ;
+    %load/vec4 v0x880c58140_0;
+    %parti/s 3, 29, 6;
+    %load/vec4 v0x880c58140_0;
+    %parti/s 3, 0, 2;
+    %concat/vec4; draw_concat_vec4
+    %dup/vec4;
+    %pushi/vec4 63, 0, 6;
+    %cmp/u;
+    %jmp/1 T_1.6, 6;
+    %dup/vec4;
+    %pushi/vec4 62, 0, 6;
+    %cmp/u;
+    %jmp/1 T_1.7, 6;
+    %dup/vec4;
+    %pushi/vec4 60, 0, 6;
+    %cmp/u;
+    %jmp/1 T_1.8, 6;
+    %dup/vec4;
+    %pushi/vec4 48, 0, 6;
+    %cmp/u;
+    %jmp/1 T_1.9, 6;
+    %dup/vec4;
+    %pushi/vec4 32, 0, 6;
+    %cmp/u;
+    %jmp/1 T_1.10, 6;
+    %dup/vec4;
+    %pushi/vec4 0, 0, 6;
+    %cmp/u;
+    %jmp/1 T_1.11, 6;
+    %load/vec4 v0x880c583c0_0;
+    %parti/s 2, 6, 4;
+    %cmpi/e 0, 0, 2;
+    %flag_mov 8, 4;
+    %jmp/0 T_1.14, 8;
+    %pushi/vec4 0, 0, 1;
+    %jmp/1 T_1.15, 8;
+T_1.14 ; End of true expr.
+    %load/vec4 v0x880c583c0_0;
+    %parti/s 2, 6, 4;
+    %cmpi/e 3, 0, 2;
+    %flag_mov 9, 4;
+    %jmp/0 T_1.16, 9;
+    %pushi/vec4 0, 0, 1;
+    %jmp/1 T_1.17, 9;
+T_1.16 ; End of true expr.
+    %pushi/vec4 1, 0, 1;
+    %jmp/0 T_1.17, 9;
+ ; End of false expr.
+    %blend;
+T_1.17;
+    %jmp/0 T_1.15, 8;
+ ; End of false expr.
+    %blend;
+T_1.15;
+    %assign/vec4 v0x880c585a0_0, 0;
+    %jmp T_1.13;
+T_1.6 ;
+    %pushi/vec4 1, 0, 1;
+    %assign/vec4 v0x880c585a0_0, 0;
+    %jmp T_1.13;
+T_1.7 ;
+    %pushi/vec4 1, 0, 1;
+    %assign/vec4 v0x880c585a0_0, 0;
+    %jmp T_1.13;
+T_1.8 ;
+    %pushi/vec4 0, 0, 1;
+    %assign/vec4 v0x880c585a0_0, 0;
+    %jmp T_1.13;
+T_1.9 ;
+    %load/vec4 v0x880c583c0_0;
+    %parti/s 2, 6, 4;
+    %cmpi/e 0, 0, 2;
+    %flag_mov 8, 4;
+    %jmp/0 T_1.18, 8;
+    %pushi/vec4 0, 0, 1;
+    %jmp/1 T_1.19, 8;
+T_1.18 ; End of true expr.
+    %pushi/vec4 1, 0, 1;
+    %jmp/0 T_1.19, 8;
+ ; End of false expr.
+    %blend;
+T_1.19;
+    %assign/vec4 v0x880c585a0_0, 0;
+    %jmp T_1.13;
+T_1.10 ;
+    %pushi/vec4 1, 0, 1;
+    %assign/vec4 v0x880c585a0_0, 0;
+    %jmp T_1.13;
+T_1.11 ;
+    %pushi/vec4 1, 0, 1;
+    %assign/vec4 v0x880c585a0_0, 0;
+    %jmp T_1.13;
+T_1.13 ;
+    %pop/vec4 1;
+    %load/vec4 v0x880c583c0_0;
+    %cmpi/e 255, 0, 8;
+    %jmp/0xz  T_1.20, 4;
+    %load/vec4 v0x880c58140_0;
+    %parti/s 31, 0, 2;
+    %concati/vec4 0, 0, 1;
+    %assign/vec4 v0x880c58140_0, 0;
+    %load/vec4 v0x880c58320_0;
+    %parti/s 31, 0, 2;
+    %concati/vec4 1, 0, 1;
+    %assign/vec4 v0x880c58320_0, 0;
+    %pushi/vec4 0, 0, 8;
+    %assign/vec4 v0x880c583c0_0, 0;
+    %jmp T_1.21;
+T_1.20 ;
+    %load/vec4 v0x880c583c0_0;
+    %addi 1, 0, 8;
+    %assign/vec4 v0x880c583c0_0, 0;
+T_1.21 ;
+T_1.1 ;
+    %jmp T_1;
+    .thread T_1;
+# The file index is used to find the file name in the following table.
+:file_names 4;
+    "N/A";
+    "<interactive>";
+    "-";
+    "/Users/donghyeok/project/Verilog-HDL/cam/ov7670_controller.v";

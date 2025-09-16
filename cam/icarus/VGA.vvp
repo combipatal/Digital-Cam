@@ -1,0 +1,187 @@
+#! /opt/homebrew/Cellar/icarus-verilog/12.0/bin/vvp
+:ivl_version "12.0 (stable)";
+:ivl_delay_selection "TYPICAL";
+:vpi_time_precision + 0;
+:vpi_module "/opt/homebrew/Cellar/icarus-verilog/12.0/lib/ivl/system.vpi";
+:vpi_module "/opt/homebrew/Cellar/icarus-verilog/12.0/lib/ivl/vhdl_sys.vpi";
+:vpi_module "/opt/homebrew/Cellar/icarus-verilog/12.0/lib/ivl/vhdl_textio.vpi";
+:vpi_module "/opt/homebrew/Cellar/icarus-verilog/12.0/lib/ivl/v2005_math.vpi";
+:vpi_module "/opt/homebrew/Cellar/icarus-verilog/12.0/lib/ivl/va_math.vpi";
+:vpi_module "/opt/homebrew/Cellar/icarus-verilog/12.0/lib/ivl/v2009.vpi";
+S_0x10517c4f0 .scope package, "$unit" "$unit" 2 1;
+ .timescale 0 0;
+S_0x10517c670 .scope module, "VGA" "VGA" 3 2;
+ .timescale 0 0;
+    .port_info 0 /INPUT 1 "CLK25";
+    .port_info 1 /OUTPUT 1 "clkout";
+    .port_info 2 /OUTPUT 1 "Hsync";
+    .port_info 3 /OUTPUT 1 "Vsync";
+    .port_info 4 /OUTPUT 1 "Nblank";
+    .port_info 5 /OUTPUT 1 "activeArea";
+    .port_info 6 /OUTPUT 1 "Nsync";
+P_0x105187940 .param/l "HB" 0 3 16, +C4<00000000000000000000000000110000>;
+P_0x105187980 .param/l "HD" 0 3 14, +C4<00000000000000000000001010000000>;
+P_0x1051879c0 .param/l "HF" 0 3 15, +C4<00000000000000000000000000010000>;
+P_0x105187a00 .param/l "HM" 0 3 13, +C4<00000000000000000000001100011111>;
+P_0x105187a40 .param/l "HR" 0 3 17, +C4<00000000000000000000000001100000>;
+P_0x105187a80 .param/l "VB" 0 3 22, +C4<00000000000000000000000000100001>;
+P_0x105187ac0 .param/l "VD" 0 3 20, +C4<00000000000000000000000111100000>;
+P_0x105187b00 .param/l "VF" 0 3 21, +C4<00000000000000000000000000001010>;
+P_0x105187b40 .param/l "VM" 0 3 19, +C4<00000000000000000000001000001100>;
+P_0x105187b80 .param/l "VR" 0 3 23, +C4<00000000000000000000000000000010>;
+L_0x105184b40 .functor AND 1, L_0x834c74640, L_0x834c746e0, C4<1>, C4<1>;
+L_0x83502c000 .functor BUFZ 1, L_0x105184b40, C4<0>, C4<0>, C4<0>;
+o0x835420010 .functor BUFZ 1, C4<z>; HiZ drive
+L_0x83502c070 .functor BUFZ 1, o0x835420010, C4<0>, C4<0>, C4<0>;
+v0x105186f70_0 .net "CLK25", 0 0, o0x835420010;  0 drivers
+v0x105187310_0 .var "Hcnt", 9 0;
+v0x1051863c0_0 .var "Hsync", 0 0;
+v0x105186150_0 .net "Nblank", 0 0, L_0x83502c000;  1 drivers
+L_0x835454010 .functor BUFT 1, C4<1>, C4<0>, C4<0>, C4<0>;
+v0x105184aa0_0 .net "Nsync", 0 0, L_0x835454010;  1 drivers
+v0x105187bc0_0 .var "Vcnt", 9 0;
+v0x105187c60_0 .var "Vsync", 0 0;
+v0x105187d00_0 .net *"_ivl_10", 31 0, L_0x105187f40;  1 drivers
+L_0x8354540e8 .functor BUFT 1, C4<0000000000000000000000>, C4<0>, C4<0>, C4<0>;
+v0x834c74000_0 .net *"_ivl_13", 21 0, L_0x8354540e8;  1 drivers
+L_0x835454130 .functor BUFT 1, C4<00000000000000000000000111100000>, C4<0>, C4<0>, C4<0>;
+v0x834c740a0_0 .net/2u *"_ivl_14", 31 0, L_0x835454130;  1 drivers
+v0x834c74140_0 .net *"_ivl_16", 0 0, L_0x834c746e0;  1 drivers
+v0x834c741e0_0 .net *"_ivl_2", 31 0, L_0x105187ea0;  1 drivers
+L_0x835454058 .functor BUFT 1, C4<0000000000000000000000>, C4<0>, C4<0>, C4<0>;
+v0x834c74280_0 .net *"_ivl_5", 21 0, L_0x835454058;  1 drivers
+L_0x8354540a0 .functor BUFT 1, C4<00000000000000000000001010000000>, C4<0>, C4<0>, C4<0>;
+v0x834c74320_0 .net/2u *"_ivl_6", 31 0, L_0x8354540a0;  1 drivers
+v0x834c743c0_0 .net *"_ivl_8", 0 0, L_0x834c74640;  1 drivers
+v0x834c74460_0 .var "activeArea", 0 0;
+v0x834c74500_0 .net "clkout", 0 0, L_0x83502c070;  1 drivers
+v0x834c745a0_0 .net "video", 0 0, L_0x105184b40;  1 drivers
+E_0x105186c10 .event posedge, v0x105186f70_0;
+L_0x105187ea0 .concat [ 10 22 0 0], v0x105187310_0, L_0x835454058;
+L_0x834c74640 .cmp/gt 32, L_0x8354540a0, L_0x105187ea0;
+L_0x105187f40 .concat [ 10 22 0 0], v0x105187bc0_0, L_0x8354540e8;
+L_0x834c746e0 .cmp/gt 32, L_0x835454130, L_0x105187f40;
+    .scope S_0x10517c670;
+T_0 ;
+    %pushi/vec4 0, 0, 10;
+    %store/vec4 v0x105187310_0, 0, 10;
+    %pushi/vec4 520, 0, 10;
+    %store/vec4 v0x105187bc0_0, 0, 10;
+    %end;
+    .thread T_0, $init;
+    .scope S_0x10517c670;
+T_1 ;
+    %wait E_0x105186c10;
+    %load/vec4 v0x105187310_0;
+    %pad/u 32;
+    %cmpi/e 799, 0, 32;
+    %jmp/0xz  T_1.0, 4;
+    %pushi/vec4 0, 0, 10;
+    %assign/vec4 v0x105187310_0, 0;
+    %load/vec4 v0x105187bc0_0;
+    %pad/u 32;
+    %cmpi/e 524, 0, 32;
+    %jmp/0xz  T_1.2, 4;
+    %pushi/vec4 0, 0, 10;
+    %assign/vec4 v0x105187bc0_0, 0;
+    %jmp T_1.3;
+T_1.2 ;
+    %load/vec4 v0x105187bc0_0;
+    %addi 1, 0, 10;
+    %assign/vec4 v0x105187bc0_0, 0;
+T_1.3 ;
+    %jmp T_1.1;
+T_1.0 ;
+    %load/vec4 v0x105187310_0;
+    %addi 1, 0, 10;
+    %assign/vec4 v0x105187310_0, 0;
+T_1.1 ;
+    %jmp T_1;
+    .thread T_1;
+    .scope S_0x10517c670;
+T_2 ;
+    %wait E_0x105186c10;
+    %load/vec4 v0x105187310_0;
+    %pad/u 32;
+    %cmpi/u 320, 0, 32;
+    %flag_get/vec4 5;
+    %jmp/0 T_2.2, 5;
+    %load/vec4 v0x105187bc0_0;
+    %pad/u 32;
+    %cmpi/u 240, 0, 32;
+    %flag_get/vec4 5;
+    %and;
+T_2.2;
+    %flag_set/vec4 8;
+    %jmp/0xz  T_2.0, 8;
+    %pushi/vec4 1, 0, 1;
+    %assign/vec4 v0x834c74460_0, 0;
+    %jmp T_2.1;
+T_2.0 ;
+    %pushi/vec4 0, 0, 1;
+    %assign/vec4 v0x834c74460_0, 0;
+T_2.1 ;
+    %jmp T_2;
+    .thread T_2;
+    .scope S_0x10517c670;
+T_3 ;
+    %wait E_0x105186c10;
+    %load/vec4 v0x105187310_0;
+    %pad/u 32;
+    %cmpi/u 656, 0, 32;
+    %flag_inv 5; GE is !LT
+    %flag_get/vec4 5;
+    %jmp/0 T_3.2, 5;
+    %load/vec4 v0x105187310_0;
+    %pad/u 32;
+    %cmpi/u 751, 0, 32;
+    %flag_get/vec4 4;
+    %flag_get/vec4 5;
+    %or;
+    %and;
+T_3.2;
+    %flag_set/vec4 8;
+    %jmp/0xz  T_3.0, 8;
+    %pushi/vec4 0, 0, 1;
+    %assign/vec4 v0x1051863c0_0, 0;
+    %jmp T_3.1;
+T_3.0 ;
+    %pushi/vec4 1, 0, 1;
+    %assign/vec4 v0x1051863c0_0, 0;
+T_3.1 ;
+    %jmp T_3;
+    .thread T_3;
+    .scope S_0x10517c670;
+T_4 ;
+    %wait E_0x105186c10;
+    %load/vec4 v0x105187bc0_0;
+    %pad/u 32;
+    %cmpi/u 490, 0, 32;
+    %flag_inv 5; GE is !LT
+    %flag_get/vec4 5;
+    %jmp/0 T_4.2, 5;
+    %load/vec4 v0x105187bc0_0;
+    %pad/u 32;
+    %cmpi/u 491, 0, 32;
+    %flag_get/vec4 4;
+    %flag_get/vec4 5;
+    %or;
+    %and;
+T_4.2;
+    %flag_set/vec4 8;
+    %jmp/0xz  T_4.0, 8;
+    %pushi/vec4 0, 0, 1;
+    %assign/vec4 v0x105187c60_0, 0;
+    %jmp T_4.1;
+T_4.0 ;
+    %pushi/vec4 1, 0, 1;
+    %assign/vec4 v0x105187c60_0, 0;
+T_4.1 ;
+    %jmp T_4;
+    .thread T_4;
+# The file index is used to find the file name in the following table.
+:file_names 4;
+    "N/A";
+    "<interactive>";
+    "-";
+    "/Users/donghyeok/project/Verilog-HDL/cam/VGA.v";
