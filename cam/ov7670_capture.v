@@ -14,8 +14,8 @@ module ov7670_capture (
     reg [15:0] d_latch = 16'h0000;        // 16비트 픽셀 데이터 래치 (RGB565)
     reg [16:0] address = 17'h00000;       // RAM 쓰기 주소 (76800개 픽셀)
     reg [1:0]  line = 2'b00;              // 현재 라인 카운터 (0-3)
-    reg [6:0]  href_last = 7'b0000000;    // HREF 신호 히스토리 (7비트 시프트)
     reg        href_hold = 1'b0;          // HREF 이전 상태
+    reg [6:0]  href_last = 7'b0000000;    // HREF 신호 히스토리 (7비트 시프트)
     reg        latched_vsync = 1'b0;      // 래치된 VSYNC 신호
     reg        latched_href = 1'b0;       // 래치된 HREF 신호
     reg [7:0]  latched_d = 8'h00;         // 래치된 픽셀 데이터
@@ -47,7 +47,7 @@ module ov7670_capture (
         end
         we <= 1'b0;  // 쓰기 신호 초기화
         
-        // 새 프레임 감지 - VSYNC가 활성화되면 프레임 시작
+        // 새 프레임 감지 - VSYNC가 활성화되면 프레임 시작 
         if (latched_vsync == 1'b1) begin
             address <= 17'h00000;      // 주소를 처음으로 리셋
             href_last <= 7'b0000000;   // HREF 히스토리 리셋
@@ -76,7 +76,7 @@ endmodule
 
 // VGA 디스플레이용 주소 생성기 모듈
 module Address_Generator (
-    input  wire        CLK25,     // 25MHz VGA 클럭
+    input  wire        clk_25_vga,// 25MHz VGA 클럭
     input  wire        enable,    // 주소 생성 활성화 신호
     input  wire        vsync,     // 수직 동기화 신호
     output wire [16:0] address    // RAM 읽기 주소
@@ -86,7 +86,7 @@ module Address_Generator (
     
     assign address = val;  // 주소 출력
     
-    always @(posedge CLK25) begin
+    always @(posedge clk_25_vga) begin
         if (enable == 1'b1) begin  // 활성 영역에서만 주소 증가
             // 320x240 = 76800 픽셀
             if (val < 76800) begin
@@ -94,7 +94,7 @@ module Address_Generator (
             end
         end
         
-        // VSYNC에서 주소 리셋 - 새 프레임 시작
+        // VSYNC에서 주소 리셋 - 새 프레임 시작 (액티브 로우)
         if (vsync == 1'b0) begin
             val <= 17'h00000;  // 첫 번째 픽셀부터 시작
         end

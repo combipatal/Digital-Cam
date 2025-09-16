@@ -106,10 +106,19 @@ module sobel_3x3_gray8 (
         end
     end
 
-    // clamp & output
+    // clamp & output (임계값 하향/완화)
     always @(posedge clk) begin
         if (enable && reset_done && valid_addr && active_area) begin
-            pixel_out   <= (mag[10:8] != 3'b000) ? 8'hFF : mag[7:0];
+            // 이전: 포화 조건이 낮아 암부가 쉽게 0에 가까워졌음
+            // 변경: 소프트 임계 + 약한 감마 보정
+            // 1) 소프트 컷: 4를 빼고 하한 0 고정
+            // 2) 약한 확장: 상위 비트 손실 줄이기 위해 (mag - 4) << 0 (동일) 유지
+            // 3) 상위 포화는 동일
+            if (mag[10:8] != 3'b000) begin
+                pixel_out <= 8'hFF;
+            end else begin
+                pixel_out <= (mag[7:0] > 8'd2) ? (mag[7:0] - 8'd2) : 8'd0;
+            end
             sobel_ready <= 1'b1;
         end else begin
             pixel_out   <= 8'h00;
