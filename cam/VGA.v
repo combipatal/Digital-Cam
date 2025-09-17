@@ -1,12 +1,14 @@
 // VGA 컨트롤러 - 640x480 @ 60Hz, 25MHz 픽셀 클럭
 module VGA (
     input  wire CLK25,         // 25MHz 클럭 입력
+    input  wire [15:0] pixel_data, // 픽셀 데이터 입력
     output wire clkout,        // ADV7123 및 TFT 화면용 클럭 출력
     output reg  Hsync,         // 수평 동기화
     output reg  Vsync,         // 수직 동기화
     output wire Nblank,        // DAC용 블랭킹 신호
     output reg  activeArea,    // 활성 디스플레이 영역 (320x240 윈도우)
-    output wire Nsync          // TFT용 동기화 신호
+    output wire Nsync,         // TFT용 동기화 신호
+    output wire [16:0] pixel_address // 현재 픽셀 주소
 );
 
     // VGA 타이밍 파라미터 - 640x480 @ 60Hz
@@ -27,17 +29,29 @@ module VGA (
     reg [9:0] Vcnt = 10'd520;      // 수직 카운터 (520으로 초기화)
     wire video;                    // 비디오 활성 신호
     
+    // 픽셀 주소 생성 (320x240 = 76800 픽셀)
+    reg [16:0] pixel_addr = 17'h00000;  // 픽셀 주소 카운터
+    assign pixel_address = pixel_addr;
+    
     // 320x240 윈도우를 위한 픽셀 카운팅
     always @(posedge CLK25) begin
         if (Hcnt == HM) begin  // 라인 끝
             Hcnt <= 10'd0;     // 수평 카운터 리셋
             if (Vcnt == VM) begin  // 프레임 끝
                 Vcnt <= 10'd0;     // 수직 카운터 리셋
+                pixel_addr <= 17'h00000;  // 픽셀 주소 리셋
             end else begin
                 Vcnt <= Vcnt + 1'b1;  // 수직 카운터 증가
             end
         end else begin
             Hcnt <= Hcnt + 1'b1;  // 수평 카운터 증가
+        end
+        
+        // 픽셀 주소 카운팅 (320x240 영역에서만)
+        if ((Hcnt < 320) && (Vcnt < 240)) begin
+            if (pixel_addr < 17'd76799) begin
+                pixel_addr <= pixel_addr + 1'b1;  // 다음 픽셀 주소
+            end
         end
     end
     

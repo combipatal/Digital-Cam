@@ -1,6 +1,6 @@
 // OV7670 카메라 인터페이스 최상위 모듈
 // 카메라 캡처, 프레임 버퍼, VGA 디스플레이를 통합한 메인 모듈
-module digital_cam_top (
+module   (
     input  wire        clk_50,         // 50MHz 시스템 클럭
     input  wire        btn_resend,     // 카메라 설정 재시작 버튼
     input  wire        sw_grayscale,   // SW[0] 그레이스케일 모드 스위치
@@ -172,7 +172,7 @@ module digital_cam_top (
 
     // 가우시안 블러 (그레이스케일 8비트)
     wire [7:0] gray_blur;
-    gaussian_3x3_gray8 filter_inst (
+    gaussian_3x3_gray8 gaussian_gray_inst (
         .clk(clk_25_vga),
         .enable(1'b1),
         .pixel_in(gray_value),
@@ -243,12 +243,14 @@ module digital_cam_top (
     // VGA 컨트롤러
     VGA vga_inst (
         .CLK25(clk_25_vga),        // 25MHz VGA 클럭
+        .pixel_data(rddata),       // 픽셀 데이터 입력
         .clkout(vga_CLK),          // VGA 클럭 출력
         .Hsync(vga_hsync),         // 수평 동기화
         .Vsync(vSync),             // 수직 동기화
         .Nblank(nBlank),           // 블랭킹 신호
         .Nsync(vga_sync_N),        // 동기화 신호
-        .activeArea(activeArea)    // 활성 영역
+        .activeArea(activeArea),   // 활성 영역
+        .pixel_address(rdaddress)  // 픽셀 주소 출력
     );
     
     // OV7670 카메라 컨트롤러
@@ -282,7 +284,7 @@ module digital_cam_top (
         .wraddress(wraddress_ram1), // 쓰기 주소
         .wrclock(ov7670_pclk),      // 쓰기 클럭 (카메라 픽셀 클럭)
         .wren(wren_ram1),           // 쓰기 활성화
-        .rdaddress(rdaddress_ram1), // 읽기 주소
+        .rdaddress(rdaddress_sync[15:0]), // 읽기 주소 (3클럭 지연)
         .rdclock(clk_25_vga),       // 읽기 클럭 (VGA 클럭)
         .q(rddata_ram1)             // 읽기 데이터
     );
@@ -293,17 +295,13 @@ module digital_cam_top (
         .wraddress(wraddress_ram2), // 쓰기 주소
         .wrclock(ov7670_pclk),      // 쓰기 클럭 (카메라 픽셀 클럭)
         .wren(wren_ram2),           // 쓰기 활성화
-        .rdaddress(rdaddress_ram2), // 읽기 주소
+        .rdaddress(rdaddress_sync[15:0]), // 읽기 주소 (3클럭 지연)
         .rdclock(clk_25_vga),       // 읽기 클럭 (VGA 클럭)
         .q(rddata_ram2)             // 읽기 데이터
     );
     
-    // 읽기용 주소 생성기
-    Address_Generator addr_gen (
-        .CLK25(clk_25_vga),         // 25MHz VGA 클럭
-        .enable(activeArea),        // 활성 영역에서만 주소 생성
-        .vsync(vSync),              // 수직 동기화
-        .address(rdaddress)         // 읽기 주소 출력
-    );
+    // VGA 주소를 3클럭 지연시켜 필터 지연과 동기화
+    // 초기 3클럭 동안은 0번지 사용 (오버플로우 방지)
+    wire [16:0] rdaddress_sync = (rdaddress < 3) ? 17'h00000 : rdaddress - 3;
     
 endmodule

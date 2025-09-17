@@ -1,0 +1,2194 @@
+
+3. Executing JSON backend.
+{
+  "creator": "Yosys 0.48 (git sha1 aaa5347494801e9e3870b31387da59da24233f76, clang++ 18.1.2-wasi-sdk -O3)",
+  "modules": {
+    "i2c_sender": {
+      "attributes": {
+        "cells_not_processed": "00000000000000000000000000000001",
+        "src": "{workspace}/ov7670_controller.v:53.1-114.10"
+      },
+      "ports": {
+        "clk_50": {
+          "direction": "input",
+          "bits": [ 2 ]
+        },
+        "siod": {
+          "direction": "inout",
+          "bits": [ 3 ]
+        },
+        "sioc": {
+          "direction": "output",
+          "bits": [ 4 ]
+        },
+        "taken": {
+          "direction": "output",
+          "bits": [ 5 ]
+        },
+        "send": {
+          "direction": "input",
+          "bits": [ 6 ]
+        },
+        "id": {
+          "direction": "input",
+          "bits": [ 7, 8, 9, 10, 11, 12, 13, 14 ]
+        },
+        "data": {
+          "direction": "input",
+          "bits": [ 15, 16, 17, 18, 19, 20, 21, 22 ]
+        },
+        "value": {
+          "direction": "input",
+          "bits": [ 23, 24, 25, 26, 27, 28, 29, 30 ]
+        }
+      },
+      "cells": {
+        "$add${workspace}/ov7670_controller.v:109$20": {
+          "hide_name": 1,
+          "type": "$add",
+          "parameters": {
+            "A_SIGNED": "00000000000000000000000000000000",
+            "A_WIDTH": "00000000000000000000000000001000",
+            "B_SIGNED": "00000000000000000000000000000000",
+            "B_WIDTH": "00000000000000000000000000000001",
+            "Y_WIDTH": "00000000000000000000000000001000"
+          },
+          "attributes": {
+            "src": "{workspace}/ov7670_controller.v:109.28-109.42"
+          },
+          "port_directions": {
+            "A": "input",
+            "B": "input",
+            "Y": "output"
+          },
+          "connections": {
+            "A": [ 31, 32, 33, 34, 35, 36, 37, 38 ],
+            "B": [ "1" ],
+            "Y": [ 39, 40, 41, 42, 43, 44, 45, 46 ]
+          }
+        },
+        "$add${workspace}/ov7670_controller.v:87$12": {
+          "hide_name": 1,
+          "type": "$add",
+          "parameters": {
+            "A_SIGNED": "00000000000000000000000000000000",
+            "A_WIDTH": "00000000000000000000000000001000",
+            "B_SIGNED": "00000000000000000000000000000000",
+            "B_WIDTH": "00000000000000000000000000000001",
+            "Y_WIDTH": "00000000000000000000000000001000"
+          },
+          "attributes": {
+            "src": "{workspace}/ov7670_controller.v:87.32-87.46"
+          },
+          "port_directions": {
+            "A": "input",
+            "B": "input",
+            "Y": "output"
+          },
+          "connections": {
+            "A": [ 31, 32, 33, 34, 35, 36, 37, 38 ],
+            "B": [ "1" ],
+            "Y": [ 47, 48, 49, 50, 51, 52, 53, 54 ]
+          }
+        },
+        "$eq${workspace}/ov7670_controller.v:100$16": {
+          "hide_name": 1,
+          "type": "$eq",
+          "parameters": {
+            "A_SIGNED": "00000000000000000000000000000000",
+            "A_WIDTH": "00000000000000000000000000000010",
+            "B_SIGNED": "00000000000000000000000000000000",
+            "B_WIDTH": "00000000000000000000000000000010",
+            "Y_WIDTH": "00000000000000000000000000000001"
+          },
+          "attributes": {
+            "src": "{workspace}/ov7670_controller.v:100.34-100.55"
+          },
+          "port_directions": {
+            "A": "input",
+            "B": "input",
+            "Y": "output"
+          },
+          "connections": {
+            "A": [ 37, 38 ],
+            "B": [ "1", "1" ],
+            "Y": [ 55 ]
+          }
+        },
+        "$eq${workspace}/ov7670_controller.v:104$19": {
+          "hide_name": 1,
+          "type": "$eq",
+          "parameters": {
+            "A_SIGNED": "00000000000000000000000000000000",
+            "A_WIDTH": "00000000000000000000000000001000",
+            "B_SIGNED": "00000000000000000000000000000000",
+            "B_WIDTH": "00000000000000000000000000001000",
+            "Y_WIDTH": "00000000000000000000000000000001"
+          },
+          "attributes": {
+            "src": "{workspace}/ov7670_controller.v:104.17-104.33"
+          },
+          "port_directions": {
+            "A": "input",
+            "B": "input",
+            "Y": "output"
+          },
+          "connections": {
+            "A": [ 31, 32, 33, 34, 35, 36, 37, 38 ],
+            "B": [ "1", "1", "1", "1", "1", "1", "1", "1" ],
+            "Y": [ 56 ]
+          }
+        },
+        "$eq${workspace}/ov7670_controller.v:69$2": {
+          "hide_name": 1,
+          "type": "$eq",
+          "parameters": {
+            "A_SIGNED": "00000000000000000000000000000000",
+            "A_WIDTH": "00000000000000000000000000000010",
+            "B_SIGNED": "00000000000000000000000000000000",
+            "B_WIDTH": "00000000000000000000000000000010",
+            "Y_WIDTH": "00000000000000000000000000000001"
+          },
+          "attributes": {
+            "src": "{workspace}/ov7670_controller.v:69.21-69.44"
+          },
+          "port_directions": {
+            "A": "input",
+            "B": "input",
+            "Y": "output"
+          },
+          "connections": {
+            "A": [ 57, 58 ],
+            "B": [ "0", "1" ],
+            "Y": [ 59 ]
+          }
+        },
+        "$eq${workspace}/ov7670_controller.v:70$3": {
+          "hide_name": 1,
+          "type": "$eq",
+          "parameters": {
+            "A_SIGNED": "00000000000000000000000000000000",
+            "A_WIDTH": "00000000000000000000000000000010",
+            "B_SIGNED": "00000000000000000000000000000000",
+            "B_WIDTH": "00000000000000000000000000000010",
+            "Y_WIDTH": "00000000000000000000000000000001"
+          },
+          "attributes": {
+            "src": "{workspace}/ov7670_controller.v:70.21-70.44"
+          },
+          "port_directions": {
+            "A": "input",
+            "B": "input",
+            "Y": "output"
+          },
+          "connections": {
+            "A": [ 60, 61 ],
+            "B": [ "0", "1" ],
+            "Y": [ 62 ]
+          }
+        },
+        "$eq${workspace}/ov7670_controller.v:71$5": {
+          "hide_name": 1,
+          "type": "$eq",
+          "parameters": {
+            "A_SIGNED": "00000000000000000000000000000000",
+            "A_WIDTH": "00000000000000000000000000000010",
+            "B_SIGNED": "00000000000000000000000000000000",
+            "B_WIDTH": "00000000000000000000000000000010",
+            "Y_WIDTH": "00000000000000000000000000000001"
+          },
+          "attributes": {
+            "src": "{workspace}/ov7670_controller.v:71.21-71.44"
+          },
+          "port_directions": {
+            "A": "input",
+            "B": "input",
+            "Y": "output"
+          },
+          "connections": {
+            "A": [ 63, 64 ],
+            "B": [ "0", "1" ],
+            "Y": [ 65 ]
+          }
+        },
+        "$eq${workspace}/ov7670_controller.v:77$9": {
+          "hide_name": 1,
+          "type": "$not",
+          "parameters": {
+            "A_SIGNED": "00000000000000000000000000000000",
+            "A_WIDTH": "00000000000000000000000000000001",
+            "Y_WIDTH": "00000000000000000000000000000001"
+          },
+          "attributes": {
+            "src": "{workspace}/ov7670_controller.v:77.13-77.32"
+          },
+          "port_directions": {
+            "A": "input",
+            "Y": "output"
+          },
+          "connections": {
+            "A": [ 66 ],
+            "Y": [ 67 ]
+          }
+        },
+        "$eq${workspace}/ov7670_controller.v:80$11": {
+          "hide_name": 1,
+          "type": "$logic_not",
+          "parameters": {
+            "A_SIGNED": "00000000000000000000000000000000",
+            "A_WIDTH": "00000000000000000000000000001000",
+            "Y_WIDTH": "00000000000000000000000000000001"
+          },
+          "attributes": {
+            "src": "{workspace}/ov7670_controller.v:80.21-80.37"
+          },
+          "port_directions": {
+            "A": "input",
+            "Y": "output"
+          },
+          "connections": {
+            "A": [ 31, 32, 33, 34, 35, 36, 37, 38 ],
+            "Y": [ 68 ]
+          }
+        },
+        "$eq${workspace}/ov7670_controller.v:96$13": {
+          "hide_name": 1,
+          "type": "$logic_not",
+          "parameters": {
+            "A_SIGNED": "00000000000000000000000000000000",
+            "A_WIDTH": "00000000000000000000000000000010",
+            "Y_WIDTH": "00000000000000000000000000000001"
+          },
+          "attributes": {
+            "src": "{workspace}/ov7670_controller.v:96.38-96.59"
+          },
+          "port_directions": {
+            "A": "input",
+            "Y": "output"
+          },
+          "connections": {
+            "A": [ 37, 38 ],
+            "Y": [ 69 ]
+          }
+        },
+        "$eq${workspace}/ov7670_controller.v:99$15": {
+          "hide_name": 1,
+          "type": "$logic_not",
+          "parameters": {
+            "A_SIGNED": "00000000000000000000000000000000",
+            "A_WIDTH": "00000000000000000000000000000010",
+            "Y_WIDTH": "00000000000000000000000000000001"
+          },
+          "attributes": {
+            "src": "{workspace}/ov7670_controller.v:99.35-99.56"
+          },
+          "port_directions": {
+            "A": "input",
+            "Y": "output"
+          },
+          "connections": {
+            "A": [ 37, 38 ],
+            "Y": [ 70 ]
+          }
+        },
+        "$logic_or${workspace}/ov7670_controller.v:69$4": {
+          "hide_name": 1,
+          "type": "$logic_or",
+          "parameters": {
+            "A_SIGNED": "00000000000000000000000000000000",
+            "A_WIDTH": "00000000000000000000000000000001",
+            "B_SIGNED": "00000000000000000000000000000000",
+            "B_WIDTH": "00000000000000000000000000000001",
+            "Y_WIDTH": "00000000000000000000000000000001"
+          },
+          "attributes": {
+            "src": "{workspace}/ov7670_controller.v:69.20-70.45"
+          },
+          "port_directions": {
+            "A": "input",
+            "B": "input",
+            "Y": "output"
+          },
+          "connections": {
+            "A": [ 59 ],
+            "B": [ 62 ],
+            "Y": [ 71 ]
+          }
+        },
+        "$logic_or${workspace}/ov7670_controller.v:69$6": {
+          "hide_name": 1,
+          "type": "$logic_or",
+          "parameters": {
+            "A_SIGNED": "00000000000000000000000000000000",
+            "A_WIDTH": "00000000000000000000000000000001",
+            "B_SIGNED": "00000000000000000000000000000000",
+            "B_WIDTH": "00000000000000000000000000000001",
+            "Y_WIDTH": "00000000000000000000000000000001"
+          },
+          "attributes": {
+            "src": "{workspace}/ov7670_controller.v:69.20-71.45"
+          },
+          "port_directions": {
+            "A": "input",
+            "B": "input",
+            "Y": "output"
+          },
+          "connections": {
+            "A": [ 71 ],
+            "B": [ 65 ],
+            "Y": [ 72 ]
+          }
+        },
+        "$procdff$94": {
+          "hide_name": 1,
+          "type": "$dff",
+          "parameters": {
+            "CLK_POLARITY": "1",
+            "WIDTH": "00000000000000000000000000000001"
+          },
+          "attributes": {
+            "src": "{workspace}/ov7670_controller.v:73.5-112.8"
+          },
+          "port_directions": {
+            "CLK": "input",
+            "D": "input",
+            "Q": "output"
+          },
+          "connections": {
+            "CLK": [ 2 ],
+            "D": [ 73 ],
+            "Q": [ 4 ]
+          }
+        },
+        "$procdff$95": {
+          "hide_name": 1,
+          "type": "$dff",
+          "parameters": {
+            "CLK_POLARITY": "1",
+            "WIDTH": "00000000000000000000000000000001"
+          },
+          "attributes": {
+            "src": "{workspace}/ov7670_controller.v:73.5-112.8"
+          },
+          "port_directions": {
+            "CLK": "input",
+            "D": "input",
+            "Q": "output"
+          },
+          "connections": {
+            "CLK": [ 2 ],
+            "D": [ 74 ],
+            "Q": [ 5 ]
+          }
+        },
+        "$procdff$96": {
+          "hide_name": 1,
+          "type": "$dff",
+          "parameters": {
+            "CLK_POLARITY": "1",
+            "WIDTH": "00000000000000000000000000001000"
+          },
+          "attributes": {
+            "src": "{workspace}/ov7670_controller.v:73.5-112.8"
+          },
+          "port_directions": {
+            "CLK": "input",
+            "D": "input",
+            "Q": "output"
+          },
+          "connections": {
+            "CLK": [ 2 ],
+            "D": [ 75, 76, 77, 78, 79, 80, 81, 82 ],
+            "Q": [ 31, 32, 33, 34, 35, 36, 37, 38 ]
+          }
+        },
+        "$procdff$97": {
+          "hide_name": 1,
+          "type": "$dff",
+          "parameters": {
+            "CLK_POLARITY": "1",
+            "WIDTH": "00000000000000000000000000100000"
+          },
+          "attributes": {
+            "src": "{workspace}/ov7670_controller.v:73.5-112.8"
+          },
+          "port_directions": {
+            "CLK": "input",
+            "D": "input",
+            "Q": "output"
+          },
+          "connections": {
+            "CLK": [ 2 ],
+            "D": [ 83, 84, 85, 86, 87, 88, 89, 90, 91, 92, 93, 94, 95, 96, 97, 98, 99, 100, 101, 102, 103, 104, 105, 106, 107, 108, 109, 110, 111, 112, 113, 114 ],
+            "Q": [ 115, 116, 117, 118, 119, 120, 121, 122, 123, 124, 57, 58, 125, 126, 127, 128, 129, 130, 131, 60, 61, 132, 133, 134, 135, 136, 137, 138, 63, 64, 139, 66 ]
+          }
+        },
+        "$procdff$98": {
+          "hide_name": 1,
+          "type": "$dff",
+          "parameters": {
+            "CLK_POLARITY": "1",
+            "WIDTH": "00000000000000000000000000100000"
+          },
+          "attributes": {
+            "src": "{workspace}/ov7670_controller.v:73.5-112.8"
+          },
+          "port_directions": {
+            "CLK": "input",
+            "D": "input",
+            "Q": "output"
+          },
+          "connections": {
+            "CLK": [ 2 ],
+            "D": [ 140, 141, 142, 143, 144, 145, 146, 147, 148, 149, 150, 151, 152, 153, 154, 155, 156, 157, 158, 159, 160, 161, 162, 163, 164, 165, 166, 167, 168, 169, 170, 171 ],
+            "Q": [ 172, 173, 174, 175, 176, 177, 178, 179, 180, 181, 182, 183, 184, 185, 186, 187, 188, 189, 190, 191, 192, 193, 194, 195, 196, 197, 198, 199, 200, 201, 202, 203 ]
+          }
+        },
+        "$procmux$41": {
+          "hide_name": 1,
+          "type": "$pmux",
+          "parameters": {
+            "S_WIDTH": "00000000000000000000000000000110",
+            "WIDTH": "00000000000000000000000000000001"
+          },
+          "attributes": {
+            "full_case": "00000000000000000000000000000001",
+            "src": "{workspace}/ov7670_controller.v:0.0-0.0|{workspace}/ov7670_controller.v:92.13-101.20"
+          },
+          "port_directions": {
+            "A": "input",
+            "B": "input",
+            "S": "input",
+            "Y": "output"
+          },
+          "connections": {
+            "A": [ 204 ],
+            "B": [ "1", "1", 205, "0", "1", "1" ],
+            "S": [ 206, 207, 208, 209, 210, 211 ],
+            "Y": [ 212 ]
+          }
+        },
+        "$procmux$42_CMP0": {
+          "hide_name": 1,
+          "type": "$logic_not",
+          "parameters": {
+            "A_SIGNED": "00000000000000000000000000000000",
+            "A_WIDTH": "00000000000000000000000000000110",
+            "Y_WIDTH": "00000000000000000000000000000001"
+          },
+          "attributes": {
+            "full_case": "00000000000000000000000000000001",
+            "src": "{workspace}/ov7670_controller.v:0.0-0.0|{workspace}/ov7670_controller.v:92.13-101.20"
+          },
+          "port_directions": {
+            "A": "input",
+            "Y": "output"
+          },
+          "connections": {
+            "A": [ 115, 116, 117, 64, 139, 66 ],
+            "Y": [ 206 ]
+          }
+        },
+        "$procmux$43_CMP0": {
+          "hide_name": 1,
+          "type": "$eq",
+          "parameters": {
+            "A_SIGNED": "00000000000000000000000000000000",
+            "A_WIDTH": "00000000000000000000000000000110",
+            "B_SIGNED": "00000000000000000000000000000000",
+            "B_WIDTH": "00000000000000000000000000000110",
+            "Y_WIDTH": "00000000000000000000000000000001"
+          },
+          "attributes": {
+            "full_case": "00000000000000000000000000000001",
+            "src": "{workspace}/ov7670_controller.v:0.0-0.0|{workspace}/ov7670_controller.v:92.13-101.20"
+          },
+          "port_directions": {
+            "A": "input",
+            "B": "input",
+            "Y": "output"
+          },
+          "connections": {
+            "A": [ 115, 116, 117, 64, 139, 66 ],
+            "B": [ "0", "0", "0", "0", "0", "1" ],
+            "Y": [ 207 ]
+          }
+        },
+        "$procmux$44_CMP0": {
+          "hide_name": 1,
+          "type": "$eq",
+          "parameters": {
+            "A_SIGNED": "00000000000000000000000000000000",
+            "A_WIDTH": "00000000000000000000000000000110",
+            "B_SIGNED": "00000000000000000000000000000000",
+            "B_WIDTH": "00000000000000000000000000000110",
+            "Y_WIDTH": "00000000000000000000000000000001"
+          },
+          "attributes": {
+            "full_case": "00000000000000000000000000000001",
+            "src": "{workspace}/ov7670_controller.v:0.0-0.0|{workspace}/ov7670_controller.v:92.13-101.20"
+          },
+          "port_directions": {
+            "A": "input",
+            "B": "input",
+            "Y": "output"
+          },
+          "connections": {
+            "A": [ 115, 116, 117, 64, 139, 66 ],
+            "B": [ "0", "0", "0", "0", "1", "1" ],
+            "Y": [ 208 ]
+          }
+        },
+        "$procmux$45_CMP0": {
+          "hide_name": 1,
+          "type": "$eq",
+          "parameters": {
+            "A_SIGNED": "00000000000000000000000000000000",
+            "A_WIDTH": "00000000000000000000000000000110",
+            "B_SIGNED": "00000000000000000000000000000000",
+            "B_WIDTH": "00000000000000000000000000000110",
+            "Y_WIDTH": "00000000000000000000000000000001"
+          },
+          "attributes": {
+            "full_case": "00000000000000000000000000000001",
+            "src": "{workspace}/ov7670_controller.v:0.0-0.0|{workspace}/ov7670_controller.v:92.13-101.20"
+          },
+          "port_directions": {
+            "A": "input",
+            "B": "input",
+            "Y": "output"
+          },
+          "connections": {
+            "A": [ 115, 116, 117, 64, 139, 66 ],
+            "B": [ "0", "0", "1", "1", "1", "1" ],
+            "Y": [ 209 ]
+          }
+        },
+        "$procmux$46_CMP0": {
+          "hide_name": 1,
+          "type": "$eq",
+          "parameters": {
+            "A_SIGNED": "00000000000000000000000000000000",
+            "A_WIDTH": "00000000000000000000000000000110",
+            "B_SIGNED": "00000000000000000000000000000000",
+            "B_WIDTH": "00000000000000000000000000000110",
+            "Y_WIDTH": "00000000000000000000000000000001"
+          },
+          "attributes": {
+            "full_case": "00000000000000000000000000000001",
+            "src": "{workspace}/ov7670_controller.v:0.0-0.0|{workspace}/ov7670_controller.v:92.13-101.20"
+          },
+          "port_directions": {
+            "A": "input",
+            "B": "input",
+            "Y": "output"
+          },
+          "connections": {
+            "A": [ 115, 116, 117, 64, 139, 66 ],
+            "B": [ "0", "1", "1", "1", "1", "1" ],
+            "Y": [ 210 ]
+          }
+        },
+        "$procmux$47_CMP0": {
+          "hide_name": 1,
+          "type": "$eq",
+          "parameters": {
+            "A_SIGNED": "00000000000000000000000000000000",
+            "A_WIDTH": "00000000000000000000000000000110",
+            "B_SIGNED": "00000000000000000000000000000000",
+            "B_WIDTH": "00000000000000000000000000000110",
+            "Y_WIDTH": "00000000000000000000000000000001"
+          },
+          "attributes": {
+            "full_case": "00000000000000000000000000000001",
+            "src": "{workspace}/ov7670_controller.v:0.0-0.0|{workspace}/ov7670_controller.v:92.13-101.20"
+          },
+          "port_directions": {
+            "A": "input",
+            "B": "input",
+            "Y": "output"
+          },
+          "connections": {
+            "A": [ 115, 116, 117, 64, 139, 66 ],
+            "B": [ "1", "1", "1", "1", "1", "1" ],
+            "Y": [ 211 ]
+          }
+        },
+        "$procmux$49": {
+          "hide_name": 1,
+          "type": "$mux",
+          "parameters": {
+            "WIDTH": "00000000000000000000000000000001"
+          },
+          "attributes": {
+            "full_case": "00000000000000000000000000000001",
+            "src": "{workspace}/ov7670_controller.v:77.13-77.32|{workspace}/ov7670_controller.v:77.9-111.12"
+          },
+          "port_directions": {
+            "A": "input",
+            "B": "input",
+            "S": "input",
+            "Y": "output"
+          },
+          "connections": {
+            "A": [ "1" ],
+            "B": [ 212 ],
+            "S": [ 66 ],
+            "Y": [ 73 ]
+          }
+        },
+        "$procmux$53": {
+          "hide_name": 1,
+          "type": "$mux",
+          "parameters": {
+            "WIDTH": "00000000000000000000000000000001"
+          },
+          "attributes": {
+            "full_case": "00000000000000000000000000000001",
+            "src": "{workspace}/ov7670_controller.v:80.21-80.37|{workspace}/ov7670_controller.v:80.17-88.20"
+          },
+          "port_directions": {
+            "A": "input",
+            "B": "input",
+            "S": "input",
+            "Y": "output"
+          },
+          "connections": {
+            "A": [ "0" ],
+            "B": [ "1" ],
+            "S": [ 68 ],
+            "Y": [ 213 ]
+          }
+        },
+        "$procmux$55": {
+          "hide_name": 1,
+          "type": "$mux",
+          "parameters": {
+            "WIDTH": "00000000000000000000000000000001"
+          },
+          "attributes": {
+            "src": "{workspace}/ov7670_controller.v:79.17-79.29|{workspace}/ov7670_controller.v:79.13-89.16"
+          },
+          "port_directions": {
+            "A": "input",
+            "B": "input",
+            "S": "input",
+            "Y": "output"
+          },
+          "connections": {
+            "A": [ "0" ],
+            "B": [ 213 ],
+            "S": [ 6 ],
+            "Y": [ 214 ]
+          }
+        },
+        "$procmux$57": {
+          "hide_name": 1,
+          "type": "$mux",
+          "parameters": {
+            "WIDTH": "00000000000000000000000000000001"
+          },
+          "attributes": {
+            "full_case": "00000000000000000000000000000001",
+            "src": "{workspace}/ov7670_controller.v:77.13-77.32|{workspace}/ov7670_controller.v:77.9-111.12"
+          },
+          "port_directions": {
+            "A": "input",
+            "B": "input",
+            "S": "input",
+            "Y": "output"
+          },
+          "connections": {
+            "A": [ 214 ],
+            "B": [ "0" ],
+            "S": [ 66 ],
+            "Y": [ 74 ]
+          }
+        },
+        "$procmux$60": {
+          "hide_name": 1,
+          "type": "$mux",
+          "parameters": {
+            "WIDTH": "00000000000000000000000000100000"
+          },
+          "attributes": {
+            "full_case": "00000000000000000000000000000001",
+            "src": "{workspace}/ov7670_controller.v:104.17-104.33|{workspace}/ov7670_controller.v:104.13-110.16"
+          },
+          "port_directions": {
+            "A": "input",
+            "B": "input",
+            "S": "input",
+            "Y": "output"
+          },
+          "connections": {
+            "A": [ 172, 173, 174, 175, 176, 177, 178, 179, 180, 181, 182, 183, 184, 185, 186, 187, 188, 189, 190, 191, 192, 193, 194, 195, 196, 197, 198, 199, 200, 201, 202, 203 ],
+            "B": [ "1", 172, 173, 174, 175, 176, 177, 178, 179, 180, 181, 182, 183, 184, 185, 186, 187, 188, 189, 190, 191, 192, 193, 194, 195, 196, 197, 198, 199, 200, 201, 202 ],
+            "S": [ 56 ],
+            "Y": [ 215, 216, 217, 218, 219, 220, 221, 222, 223, 224, 225, 226, 227, 228, 229, 230, 231, 232, 233, 234, 235, 236, 237, 238, 239, 240, 241, 242, 243, 244, 245, 246 ]
+          }
+        },
+        "$procmux$64": {
+          "hide_name": 1,
+          "type": "$mux",
+          "parameters": {
+            "WIDTH": "00000000000000000000000000100000"
+          },
+          "attributes": {
+            "full_case": "00000000000000000000000000000001",
+            "src": "{workspace}/ov7670_controller.v:80.21-80.37|{workspace}/ov7670_controller.v:80.17-88.20"
+          },
+          "port_directions": {
+            "A": "input",
+            "B": "input",
+            "S": "input",
+            "Y": "output"
+          },
+          "connections": {
+            "A": [ 172, 173, 174, 175, 176, 177, 178, 179, 180, 181, 182, 183, 184, 185, 186, 187, 188, 189, 190, 191, 192, 193, 194, 195, 196, 197, 198, 199, 200, 201, 202, 203 ],
+            "B": [ "1", "0", "0", 23, 24, 25, 26, 27, 28, 29, 30, "0", 15, 16, 17, 18, 19, 20, 21, 22, "0", 7, 8, 9, 10, 11, 12, 13, 14, "0", "0", "1" ],
+            "S": [ 68 ],
+            "Y": [ 247, 248, 249, 250, 251, 252, 253, 254, 255, 256, 257, 258, 259, 260, 261, 262, 263, 264, 265, 266, 267, 268, 269, 270, 271, 272, 273, 274, 275, 276, 277, 278 ]
+          }
+        },
+        "$procmux$66": {
+          "hide_name": 1,
+          "type": "$mux",
+          "parameters": {
+            "WIDTH": "00000000000000000000000000100000"
+          },
+          "attributes": {
+            "src": "{workspace}/ov7670_controller.v:79.17-79.29|{workspace}/ov7670_controller.v:79.13-89.16"
+          },
+          "port_directions": {
+            "A": "input",
+            "B": "input",
+            "S": "input",
+            "Y": "output"
+          },
+          "connections": {
+            "A": [ 172, 173, 174, 175, 176, 177, 178, 179, 180, 181, 182, 183, 184, 185, 186, 187, 188, 189, 190, 191, 192, 193, 194, 195, 196, 197, 198, 199, 200, 201, 202, 203 ],
+            "B": [ 247, 248, 249, 250, 251, 252, 253, 254, 255, 256, 257, 258, 259, 260, 261, 262, 263, 264, 265, 266, 267, 268, 269, 270, 271, 272, 273, 274, 275, 276, 277, 278 ],
+            "S": [ 6 ],
+            "Y": [ 279, 280, 281, 282, 283, 284, 285, 286, 287, 288, 289, 290, 291, 292, 293, 294, 295, 296, 297, 298, 299, 300, 301, 302, 303, 304, 305, 306, 307, 308, 309, 310 ]
+          }
+        },
+        "$procmux$68": {
+          "hide_name": 1,
+          "type": "$mux",
+          "parameters": {
+            "WIDTH": "00000000000000000000000000100000"
+          },
+          "attributes": {
+            "full_case": "00000000000000000000000000000001",
+            "src": "{workspace}/ov7670_controller.v:77.13-77.32|{workspace}/ov7670_controller.v:77.9-111.12"
+          },
+          "port_directions": {
+            "A": "input",
+            "B": "input",
+            "S": "input",
+            "Y": "output"
+          },
+          "connections": {
+            "A": [ 279, 280, 281, 282, 283, 284, 285, 286, 287, 288, 289, 290, 291, 292, 293, 294, 295, 296, 297, 298, 299, 300, 301, 302, 303, 304, 305, 306, 307, 308, 309, 310 ],
+            "B": [ 215, 216, 217, 218, 219, 220, 221, 222, 223, 224, 225, 226, 227, 228, 229, 230, 231, 232, 233, 234, 235, 236, 237, 238, 239, 240, 241, 242, 243, 244, 245, 246 ],
+            "S": [ 66 ],
+            "Y": [ 140, 141, 142, 143, 144, 145, 146, 147, 148, 149, 150, 151, 152, 153, 154, 155, 156, 157, 158, 159, 160, 161, 162, 163, 164, 165, 166, 167, 168, 169, 170, 171 ]
+          }
+        },
+        "$procmux$71": {
+          "hide_name": 1,
+          "type": "$mux",
+          "parameters": {
+            "WIDTH": "00000000000000000000000000100000"
+          },
+          "attributes": {
+            "full_case": "00000000000000000000000000000001",
+            "src": "{workspace}/ov7670_controller.v:104.17-104.33|{workspace}/ov7670_controller.v:104.13-110.16"
+          },
+          "port_directions": {
+            "A": "input",
+            "B": "input",
+            "S": "input",
+            "Y": "output"
+          },
+          "connections": {
+            "A": [ 115, 116, 117, 118, 119, 120, 121, 122, 123, 124, 57, 58, 125, 126, 127, 128, 129, 130, 131, 60, 61, 132, 133, 134, 135, 136, 137, 138, 63, 64, 139, 66 ],
+            "B": [ "0", 115, 116, 117, 118, 119, 120, 121, 122, 123, 124, 57, 58, 125, 126, 127, 128, 129, 130, 131, 60, 61, 132, 133, 134, 135, 136, 137, 138, 63, 64, 139 ],
+            "S": [ 56 ],
+            "Y": [ 311, 312, 313, 314, 315, 316, 317, 318, 319, 320, 321, 322, 323, 324, 325, 326, 327, 328, 329, 330, 331, 332, 333, 334, 335, 336, 337, 338, 339, 340, 341, 342 ]
+          }
+        },
+        "$procmux$75": {
+          "hide_name": 1,
+          "type": "$mux",
+          "parameters": {
+            "WIDTH": "00000000000000000000000000100000"
+          },
+          "attributes": {
+            "full_case": "00000000000000000000000000000001",
+            "src": "{workspace}/ov7670_controller.v:80.21-80.37|{workspace}/ov7670_controller.v:80.17-88.20"
+          },
+          "port_directions": {
+            "A": "input",
+            "B": "input",
+            "S": "input",
+            "Y": "output"
+          },
+          "connections": {
+            "A": [ 115, 116, 117, 118, 119, 120, 121, 122, 123, 124, 57, 58, 125, 126, 127, 128, 129, 130, 131, 60, 61, 132, 133, 134, 135, 136, 137, 138, 63, 64, 139, 66 ],
+            "B": [ "1", "1", "1", "1", "1", "1", "1", "1", "1", "1", "1", "1", "1", "1", "1", "1", "1", "1", "1", "1", "1", "1", "1", "1", "1", "1", "1", "1", "1", "1", "1", "1" ],
+            "S": [ 68 ],
+            "Y": [ 343, 344, 345, 346, 347, 348, 349, 350, 351, 352, 353, 354, 355, 356, 357, 358, 359, 360, 361, 362, 363, 364, 365, 366, 367, 368, 369, 370, 371, 372, 373, 374 ]
+          }
+        },
+        "$procmux$77": {
+          "hide_name": 1,
+          "type": "$mux",
+          "parameters": {
+            "WIDTH": "00000000000000000000000000100000"
+          },
+          "attributes": {
+            "src": "{workspace}/ov7670_controller.v:79.17-79.29|{workspace}/ov7670_controller.v:79.13-89.16"
+          },
+          "port_directions": {
+            "A": "input",
+            "B": "input",
+            "S": "input",
+            "Y": "output"
+          },
+          "connections": {
+            "A": [ 115, 116, 117, 118, 119, 120, 121, 122, 123, 124, 57, 58, 125, 126, 127, 128, 129, 130, 131, 60, 61, 132, 133, 134, 135, 136, 137, 138, 63, 64, 139, 66 ],
+            "B": [ 343, 344, 345, 346, 347, 348, 349, 350, 351, 352, 353, 354, 355, 356, 357, 358, 359, 360, 361, 362, 363, 364, 365, 366, 367, 368, 369, 370, 371, 372, 373, 374 ],
+            "S": [ 6 ],
+            "Y": [ 375, 376, 377, 378, 379, 380, 381, 382, 383, 384, 385, 386, 387, 388, 389, 390, 391, 392, 393, 394, 395, 396, 397, 398, 399, 400, 401, 402, 403, 404, 405, 406 ]
+          }
+        },
+        "$procmux$79": {
+          "hide_name": 1,
+          "type": "$mux",
+          "parameters": {
+            "WIDTH": "00000000000000000000000000100000"
+          },
+          "attributes": {
+            "full_case": "00000000000000000000000000000001",
+            "src": "{workspace}/ov7670_controller.v:77.13-77.32|{workspace}/ov7670_controller.v:77.9-111.12"
+          },
+          "port_directions": {
+            "A": "input",
+            "B": "input",
+            "S": "input",
+            "Y": "output"
+          },
+          "connections": {
+            "A": [ 375, 376, 377, 378, 379, 380, 381, 382, 383, 384, 385, 386, 387, 388, 389, 390, 391, 392, 393, 394, 395, 396, 397, 398, 399, 400, 401, 402, 403, 404, 405, 406 ],
+            "B": [ 311, 312, 313, 314, 315, 316, 317, 318, 319, 320, 321, 322, 323, 324, 325, 326, 327, 328, 329, 330, 331, 332, 333, 334, 335, 336, 337, 338, 339, 340, 341, 342 ],
+            "S": [ 66 ],
+            "Y": [ 83, 84, 85, 86, 87, 88, 89, 90, 91, 92, 93, 94, 95, 96, 97, 98, 99, 100, 101, 102, 103, 104, 105, 106, 107, 108, 109, 110, 111, 112, 113, 114 ]
+          }
+        },
+        "$procmux$82": {
+          "hide_name": 1,
+          "type": "$mux",
+          "parameters": {
+            "WIDTH": "00000000000000000000000000001000"
+          },
+          "attributes": {
+            "full_case": "00000000000000000000000000000001",
+            "src": "{workspace}/ov7670_controller.v:104.17-104.33|{workspace}/ov7670_controller.v:104.13-110.16"
+          },
+          "port_directions": {
+            "A": "input",
+            "B": "input",
+            "S": "input",
+            "Y": "output"
+          },
+          "connections": {
+            "A": [ 39, 40, 41, 42, 43, 44, 45, 46 ],
+            "B": [ "0", "0", "0", "0", "0", "0", "0", "0" ],
+            "S": [ 56 ],
+            "Y": [ 407, 408, 409, 410, 411, 412, 413, 414 ]
+          }
+        },
+        "$procmux$86": {
+          "hide_name": 1,
+          "type": "$mux",
+          "parameters": {
+            "WIDTH": "00000000000000000000000000001000"
+          },
+          "attributes": {
+            "full_case": "00000000000000000000000000000001",
+            "src": "{workspace}/ov7670_controller.v:80.21-80.37|{workspace}/ov7670_controller.v:80.17-88.20"
+          },
+          "port_directions": {
+            "A": "input",
+            "B": "input",
+            "S": "input",
+            "Y": "output"
+          },
+          "connections": {
+            "A": [ 47, 48, 49, 50, 51, 52, 53, 54 ],
+            "B": [ 31, 32, 33, 34, 35, 36, 37, 38 ],
+            "S": [ 68 ],
+            "Y": [ 415, 416, 417, 418, 419, 420, 421, 422 ]
+          }
+        },
+        "$procmux$88": {
+          "hide_name": 1,
+          "type": "$mux",
+          "parameters": {
+            "WIDTH": "00000000000000000000000000001000"
+          },
+          "attributes": {
+            "src": "{workspace}/ov7670_controller.v:79.17-79.29|{workspace}/ov7670_controller.v:79.13-89.16"
+          },
+          "port_directions": {
+            "A": "input",
+            "B": "input",
+            "S": "input",
+            "Y": "output"
+          },
+          "connections": {
+            "A": [ 31, 32, 33, 34, 35, 36, 37, 38 ],
+            "B": [ 415, 416, 417, 418, 419, 420, 421, 422 ],
+            "S": [ 6 ],
+            "Y": [ 423, 424, 425, 426, 427, 428, 429, 430 ]
+          }
+        },
+        "$procmux$90": {
+          "hide_name": 1,
+          "type": "$mux",
+          "parameters": {
+            "WIDTH": "00000000000000000000000000001000"
+          },
+          "attributes": {
+            "full_case": "00000000000000000000000000000001",
+            "src": "{workspace}/ov7670_controller.v:77.13-77.32|{workspace}/ov7670_controller.v:77.9-111.12"
+          },
+          "port_directions": {
+            "A": "input",
+            "B": "input",
+            "S": "input",
+            "Y": "output"
+          },
+          "connections": {
+            "A": [ 423, 424, 425, 426, 427, 428, 429, 430 ],
+            "B": [ 407, 408, 409, 410, 411, 412, 413, 414 ],
+            "S": [ 66 ],
+            "Y": [ 75, 76, 77, 78, 79, 80, 81, 82 ]
+          }
+        },
+        "$ternary${workspace}/ov7670_controller.v:100$17": {
+          "hide_name": 1,
+          "type": "$mux",
+          "parameters": {
+            "WIDTH": "00000000000000000000000000000001"
+          },
+          "attributes": {
+            "src": "{workspace}/ov7670_controller.v:100.33-100.70"
+          },
+          "port_directions": {
+            "A": "input",
+            "B": "input",
+            "S": "input",
+            "Y": "output"
+          },
+          "connections": {
+            "A": [ "1" ],
+            "B": [ "0" ],
+            "S": [ 55 ],
+            "Y": [ 431 ]
+          }
+        },
+        "$ternary${workspace}/ov7670_controller.v:69$7": {
+          "hide_name": 1,
+          "type": "$mux",
+          "parameters": {
+            "WIDTH": "00000000000000000000000000000001"
+          },
+          "attributes": {
+            "src": "{workspace}/ov7670_controller.v:69.19-71.67"
+          },
+          "port_directions": {
+            "A": "input",
+            "B": "input",
+            "S": "input",
+            "Y": "output"
+          },
+          "connections": {
+            "A": [ 203 ],
+            "B": [ "z" ],
+            "S": [ 72 ],
+            "Y": [ 3 ]
+          }
+        },
+        "$ternary${workspace}/ov7670_controller.v:96$14": {
+          "hide_name": 1,
+          "type": "$mux",
+          "parameters": {
+            "WIDTH": "00000000000000000000000000000001"
+          },
+          "attributes": {
+            "src": "{workspace}/ov7670_controller.v:96.37-96.74"
+          },
+          "port_directions": {
+            "A": "input",
+            "B": "input",
+            "S": "input",
+            "Y": "output"
+          },
+          "connections": {
+            "A": [ "1" ],
+            "B": [ "0" ],
+            "S": [ 69 ],
+            "Y": [ 205 ]
+          }
+        },
+        "$ternary${workspace}/ov7670_controller.v:99$18": {
+          "hide_name": 1,
+          "type": "$mux",
+          "parameters": {
+            "WIDTH": "00000000000000000000000000000001"
+          },
+          "attributes": {
+            "src": "{workspace}/ov7670_controller.v:99.34-100.70"
+          },
+          "port_directions": {
+            "A": "input",
+            "B": "input",
+            "S": "input",
+            "Y": "output"
+          },
+          "connections": {
+            "A": [ 431 ],
+            "B": [ "0" ],
+            "S": [ 70 ],
+            "Y": [ 204 ]
+          }
+        }
+      },
+      "netnames": {
+        "$0\\busy_sr[31:0]": {
+          "hide_name": 1,
+          "bits": [ 83, 84, 85, 86, 87, 88, 89, 90, 91, 92, 93, 94, 95, 96, 97, 98, 99, 100, 101, 102, 103, 104, 105, 106, 107, 108, 109, 110, 111, 112, 113, 114 ],
+          "attributes": {
+            "src": "{workspace}/ov7670_controller.v:73.5-112.8"
+          }
+        },
+        "$0\\data_sr[31:0]": {
+          "hide_name": 1,
+          "bits": [ 140, 141, 142, 143, 144, 145, 146, 147, 148, 149, 150, 151, 152, 153, 154, 155, 156, 157, 158, 159, 160, 161, 162, 163, 164, 165, 166, 167, 168, 169, 170, 171 ],
+          "attributes": {
+            "src": "{workspace}/ov7670_controller.v:73.5-112.8"
+          }
+        },
+        "$0\\divider[7:0]": {
+          "hide_name": 1,
+          "bits": [ 75, 76, 77, 78, 79, 80, 81, 82 ],
+          "attributes": {
+            "src": "{workspace}/ov7670_controller.v:73.5-112.8"
+          }
+        },
+        "$0\\sioc[0:0]": {
+          "hide_name": 1,
+          "bits": [ 73 ],
+          "attributes": {
+            "src": "{workspace}/ov7670_controller.v:73.5-112.8"
+          }
+        },
+        "$0\\taken[0:0]": {
+          "hide_name": 1,
+          "bits": [ 74 ],
+          "attributes": {
+            "src": "{workspace}/ov7670_controller.v:73.5-112.8"
+          }
+        },
+        "$1\\busy_sr[31:0]": {
+          "hide_name": 1,
+          "bits": [ "0", "0", "0", "0", "0", "0", "0", "0", "0", "0", "0", "0", "0", "0", "0", "0", "0", "0", "0", "0", "0", "0", "0", "0", "0", "0", "0", "0", "0", "0", "0", "0" ],
+          "attributes": {
+            "src": "{workspace}/ov7670_controller.v:65.16-65.31"
+          }
+        },
+        "$1\\data_sr[31:0]": {
+          "hide_name": 1,
+          "bits": [ "1", "1", "1", "1", "1", "1", "1", "1", "1", "1", "1", "1", "1", "1", "1", "1", "1", "1", "1", "1", "1", "1", "1", "1", "1", "1", "1", "1", "1", "1", "1", "1" ],
+          "attributes": {
+            "src": "{workspace}/ov7670_controller.v:66.16-66.38"
+          }
+        },
+        "$1\\divider[7:0]": {
+          "hide_name": 1,
+          "bits": [ "1", "0", "0", "0", "0", "0", "0", "0" ],
+          "attributes": {
+            "src": "{workspace}/ov7670_controller.v:64.16-64.31"
+          }
+        },
+        "$add${workspace}/ov7670_controller.v:109$20_Y": {
+          "hide_name": 1,
+          "bits": [ 39, 40, 41, 42, 43, 44, 45, 46 ],
+          "attributes": {
+            "src": "{workspace}/ov7670_controller.v:109.28-109.42"
+          }
+        },
+        "$add${workspace}/ov7670_controller.v:87$12_Y": {
+          "hide_name": 1,
+          "bits": [ 47, 48, 49, 50, 51, 52, 53, 54 ],
+          "attributes": {
+            "src": "{workspace}/ov7670_controller.v:87.32-87.46"
+          }
+        },
+        "$eq${workspace}/ov7670_controller.v:100$16_Y": {
+          "hide_name": 1,
+          "bits": [ 55 ],
+          "attributes": {
+            "src": "{workspace}/ov7670_controller.v:100.34-100.55"
+          }
+        },
+        "$eq${workspace}/ov7670_controller.v:104$19_Y": {
+          "hide_name": 1,
+          "bits": [ 56 ],
+          "attributes": {
+            "src": "{workspace}/ov7670_controller.v:104.17-104.33"
+          }
+        },
+        "$eq${workspace}/ov7670_controller.v:69$2_Y": {
+          "hide_name": 1,
+          "bits": [ 59 ],
+          "attributes": {
+            "src": "{workspace}/ov7670_controller.v:69.21-69.44"
+          }
+        },
+        "$eq${workspace}/ov7670_controller.v:70$3_Y": {
+          "hide_name": 1,
+          "bits": [ 62 ],
+          "attributes": {
+            "src": "{workspace}/ov7670_controller.v:70.21-70.44"
+          }
+        },
+        "$eq${workspace}/ov7670_controller.v:71$5_Y": {
+          "hide_name": 1,
+          "bits": [ 65 ],
+          "attributes": {
+            "src": "{workspace}/ov7670_controller.v:71.21-71.44"
+          }
+        },
+        "$eq${workspace}/ov7670_controller.v:77$9_Y": {
+          "hide_name": 1,
+          "bits": [ 67 ],
+          "attributes": {
+            "src": "{workspace}/ov7670_controller.v:77.13-77.32"
+          }
+        },
+        "$eq${workspace}/ov7670_controller.v:79$10_Y": {
+          "hide_name": 1,
+          "bits": [ 6 ],
+          "attributes": {
+            "src": "{workspace}/ov7670_controller.v:79.17-79.29"
+          }
+        },
+        "$eq${workspace}/ov7670_controller.v:80$11_Y": {
+          "hide_name": 1,
+          "bits": [ 68 ],
+          "attributes": {
+            "src": "{workspace}/ov7670_controller.v:80.21-80.37"
+          }
+        },
+        "$eq${workspace}/ov7670_controller.v:96$13_Y": {
+          "hide_name": 1,
+          "bits": [ 69 ],
+          "attributes": {
+            "src": "{workspace}/ov7670_controller.v:96.38-96.59"
+          }
+        },
+        "$eq${workspace}/ov7670_controller.v:99$15_Y": {
+          "hide_name": 1,
+          "bits": [ 70 ],
+          "attributes": {
+            "src": "{workspace}/ov7670_controller.v:99.35-99.56"
+          }
+        },
+        "$logic_or${workspace}/ov7670_controller.v:69$4_Y": {
+          "hide_name": 1,
+          "bits": [ 71 ],
+          "attributes": {
+            "src": "{workspace}/ov7670_controller.v:69.20-70.45"
+          }
+        },
+        "$logic_or${workspace}/ov7670_controller.v:69$6_Y": {
+          "hide_name": 1,
+          "bits": [ 72 ],
+          "attributes": {
+            "src": "{workspace}/ov7670_controller.v:69.20-71.45"
+          }
+        },
+        "$procmux$41_Y": {
+          "hide_name": 1,
+          "bits": [ 212 ],
+          "attributes": {
+          }
+        },
+        "$procmux$42_CMP": {
+          "hide_name": 1,
+          "bits": [ 206 ],
+          "attributes": {
+          }
+        },
+        "$procmux$43_CMP": {
+          "hide_name": 1,
+          "bits": [ 207 ],
+          "attributes": {
+          }
+        },
+        "$procmux$44_CMP": {
+          "hide_name": 1,
+          "bits": [ 208 ],
+          "attributes": {
+          }
+        },
+        "$procmux$45_CMP": {
+          "hide_name": 1,
+          "bits": [ 209 ],
+          "attributes": {
+          }
+        },
+        "$procmux$46_CMP": {
+          "hide_name": 1,
+          "bits": [ 210 ],
+          "attributes": {
+          }
+        },
+        "$procmux$47_CMP": {
+          "hide_name": 1,
+          "bits": [ 211 ],
+          "attributes": {
+          }
+        },
+        "$procmux$49_Y": {
+          "hide_name": 1,
+          "bits": [ 73 ],
+          "attributes": {
+          }
+        },
+        "$procmux$50_CMP": {
+          "hide_name": 1,
+          "bits": [ 67 ],
+          "attributes": {
+          }
+        },
+        "$procmux$53_Y": {
+          "hide_name": 1,
+          "bits": [ 213 ],
+          "attributes": {
+          }
+        },
+        "$procmux$54_CMP": {
+          "hide_name": 1,
+          "bits": [ 68 ],
+          "attributes": {
+          }
+        },
+        "$procmux$55_Y": {
+          "hide_name": 1,
+          "bits": [ 214 ],
+          "attributes": {
+          }
+        },
+        "$procmux$56_CMP": {
+          "hide_name": 1,
+          "bits": [ 6 ],
+          "attributes": {
+          }
+        },
+        "$procmux$57_Y": {
+          "hide_name": 1,
+          "bits": [ 74 ],
+          "attributes": {
+          }
+        },
+        "$procmux$58_CMP": {
+          "hide_name": 1,
+          "bits": [ 67 ],
+          "attributes": {
+          }
+        },
+        "$procmux$60_Y": {
+          "hide_name": 1,
+          "bits": [ 215, 216, 217, 218, 219, 220, 221, 222, 223, 224, 225, 226, 227, 228, 229, 230, 231, 232, 233, 234, 235, 236, 237, 238, 239, 240, 241, 242, 243, 244, 245, 246 ],
+          "attributes": {
+          }
+        },
+        "$procmux$61_CMP": {
+          "hide_name": 1,
+          "bits": [ 56 ],
+          "attributes": {
+          }
+        },
+        "$procmux$64_Y": {
+          "hide_name": 1,
+          "bits": [ 247, 248, 249, 250, 251, 252, 253, 254, 255, 256, 257, 258, 259, 260, 261, 262, 263, 264, 265, 266, 267, 268, 269, 270, 271, 272, 273, 274, 275, 276, 277, 278 ],
+          "attributes": {
+          }
+        },
+        "$procmux$65_CMP": {
+          "hide_name": 1,
+          "bits": [ 68 ],
+          "attributes": {
+          }
+        },
+        "$procmux$66_Y": {
+          "hide_name": 1,
+          "bits": [ 279, 280, 281, 282, 283, 284, 285, 286, 287, 288, 289, 290, 291, 292, 293, 294, 295, 296, 297, 298, 299, 300, 301, 302, 303, 304, 305, 306, 307, 308, 309, 310 ],
+          "attributes": {
+          }
+        },
+        "$procmux$67_CMP": {
+          "hide_name": 1,
+          "bits": [ 6 ],
+          "attributes": {
+          }
+        },
+        "$procmux$68_Y": {
+          "hide_name": 1,
+          "bits": [ 140, 141, 142, 143, 144, 145, 146, 147, 148, 149, 150, 151, 152, 153, 154, 155, 156, 157, 158, 159, 160, 161, 162, 163, 164, 165, 166, 167, 168, 169, 170, 171 ],
+          "attributes": {
+          }
+        },
+        "$procmux$69_CMP": {
+          "hide_name": 1,
+          "bits": [ 67 ],
+          "attributes": {
+          }
+        },
+        "$procmux$71_Y": {
+          "hide_name": 1,
+          "bits": [ 311, 312, 313, 314, 315, 316, 317, 318, 319, 320, 321, 322, 323, 324, 325, 326, 327, 328, 329, 330, 331, 332, 333, 334, 335, 336, 337, 338, 339, 340, 341, 342 ],
+          "attributes": {
+          }
+        },
+        "$procmux$72_CMP": {
+          "hide_name": 1,
+          "bits": [ 56 ],
+          "attributes": {
+          }
+        },
+        "$procmux$75_Y": {
+          "hide_name": 1,
+          "bits": [ 343, 344, 345, 346, 347, 348, 349, 350, 351, 352, 353, 354, 355, 356, 357, 358, 359, 360, 361, 362, 363, 364, 365, 366, 367, 368, 369, 370, 371, 372, 373, 374 ],
+          "attributes": {
+          }
+        },
+        "$procmux$76_CMP": {
+          "hide_name": 1,
+          "bits": [ 68 ],
+          "attributes": {
+          }
+        },
+        "$procmux$77_Y": {
+          "hide_name": 1,
+          "bits": [ 375, 376, 377, 378, 379, 380, 381, 382, 383, 384, 385, 386, 387, 388, 389, 390, 391, 392, 393, 394, 395, 396, 397, 398, 399, 400, 401, 402, 403, 404, 405, 406 ],
+          "attributes": {
+          }
+        },
+        "$procmux$78_CMP": {
+          "hide_name": 1,
+          "bits": [ 6 ],
+          "attributes": {
+          }
+        },
+        "$procmux$79_Y": {
+          "hide_name": 1,
+          "bits": [ 83, 84, 85, 86, 87, 88, 89, 90, 91, 92, 93, 94, 95, 96, 97, 98, 99, 100, 101, 102, 103, 104, 105, 106, 107, 108, 109, 110, 111, 112, 113, 114 ],
+          "attributes": {
+          }
+        },
+        "$procmux$80_CMP": {
+          "hide_name": 1,
+          "bits": [ 67 ],
+          "attributes": {
+          }
+        },
+        "$procmux$82_Y": {
+          "hide_name": 1,
+          "bits": [ 407, 408, 409, 410, 411, 412, 413, 414 ],
+          "attributes": {
+          }
+        },
+        "$procmux$83_CMP": {
+          "hide_name": 1,
+          "bits": [ 56 ],
+          "attributes": {
+          }
+        },
+        "$procmux$86_Y": {
+          "hide_name": 1,
+          "bits": [ 415, 416, 417, 418, 419, 420, 421, 422 ],
+          "attributes": {
+          }
+        },
+        "$procmux$87_CMP": {
+          "hide_name": 1,
+          "bits": [ 68 ],
+          "attributes": {
+          }
+        },
+        "$procmux$88_Y": {
+          "hide_name": 1,
+          "bits": [ 423, 424, 425, 426, 427, 428, 429, 430 ],
+          "attributes": {
+          }
+        },
+        "$procmux$89_CMP": {
+          "hide_name": 1,
+          "bits": [ 6 ],
+          "attributes": {
+          }
+        },
+        "$procmux$90_Y": {
+          "hide_name": 1,
+          "bits": [ 75, 76, 77, 78, 79, 80, 81, 82 ],
+          "attributes": {
+          }
+        },
+        "$procmux$91_CMP": {
+          "hide_name": 1,
+          "bits": [ 67 ],
+          "attributes": {
+          }
+        },
+        "$ternary${workspace}/ov7670_controller.v:100$17_Y": {
+          "hide_name": 1,
+          "bits": [ 431 ],
+          "attributes": {
+            "src": "{workspace}/ov7670_controller.v:100.33-100.70"
+          }
+        },
+        "$ternary${workspace}/ov7670_controller.v:69$7_Y": {
+          "hide_name": 1,
+          "bits": [ 3 ],
+          "attributes": {
+            "src": "{workspace}/ov7670_controller.v:69.19-71.67"
+          }
+        },
+        "$ternary${workspace}/ov7670_controller.v:96$14_Y": {
+          "hide_name": 1,
+          "bits": [ 205 ],
+          "attributes": {
+            "src": "{workspace}/ov7670_controller.v:96.37-96.74"
+          }
+        },
+        "$ternary${workspace}/ov7670_controller.v:99$18_Y": {
+          "hide_name": 1,
+          "bits": [ 204 ],
+          "attributes": {
+            "src": "{workspace}/ov7670_controller.v:99.34-100.70"
+          }
+        },
+        "busy_sr": {
+          "hide_name": 0,
+          "bits": [ 115, 116, 117, 118, 119, 120, 121, 122, 123, 124, 57, 58, 125, 126, 127, 128, 129, 130, 131, 60, 61, 132, 133, 134, 135, 136, 137, 138, 63, 64, 139, 66 ],
+          "attributes": {
+            "init": "00000000000000000000000000000000",
+            "src": "{workspace}/ov7670_controller.v:65.16-65.23"
+          }
+        },
+        "clk_50": {
+          "hide_name": 0,
+          "bits": [ 2 ],
+          "attributes": {
+            "src": "{workspace}/ov7670_controller.v:54.23-54.29"
+          }
+        },
+        "data": {
+          "hide_name": 0,
+          "bits": [ 15, 16, 17, 18, 19, 20, 21, 22 ],
+          "attributes": {
+            "src": "{workspace}/ov7670_controller.v:60.23-60.27"
+          }
+        },
+        "data_sr": {
+          "hide_name": 0,
+          "bits": [ 172, 173, 174, 175, 176, 177, 178, 179, 180, 181, 182, 183, 184, 185, 186, 187, 188, 189, 190, 191, 192, 193, 194, 195, 196, 197, 198, 199, 200, 201, 202, 203 ],
+          "attributes": {
+            "init": "11111111111111111111111111111111",
+            "src": "{workspace}/ov7670_controller.v:66.16-66.23"
+          }
+        },
+        "divider": {
+          "hide_name": 0,
+          "bits": [ 31, 32, 33, 34, 35, 36, 37, 38 ],
+          "attributes": {
+            "init": "00000001",
+            "src": "{workspace}/ov7670_controller.v:64.16-64.23"
+          }
+        },
+        "id": {
+          "hide_name": 0,
+          "bits": [ 7, 8, 9, 10, 11, 12, 13, 14 ],
+          "attributes": {
+            "src": "{workspace}/ov7670_controller.v:59.23-59.25"
+          }
+        },
+        "send": {
+          "hide_name": 0,
+          "bits": [ 6 ],
+          "attributes": {
+            "src": "{workspace}/ov7670_controller.v:58.23-58.27"
+          }
+        },
+        "sioc": {
+          "hide_name": 0,
+          "bits": [ 4 ],
+          "attributes": {
+            "src": "{workspace}/ov7670_controller.v:56.23-56.27"
+          }
+        },
+        "siod": {
+          "hide_name": 0,
+          "bits": [ 3 ],
+          "attributes": {
+            "src": "{workspace}/ov7670_controller.v:55.23-55.27"
+          }
+        },
+        "taken": {
+          "hide_name": 0,
+          "bits": [ 5 ],
+          "attributes": {
+            "src": "{workspace}/ov7670_controller.v:57.23-57.28"
+          }
+        },
+        "value": {
+          "hide_name": 0,
+          "bits": [ 23, 24, 25, 26, 27, 28, 29, 30 ],
+          "attributes": {
+            "src": "{workspace}/ov7670_controller.v:61.23-61.28"
+          }
+        }
+      }
+    },
+    "ov7670_controller": {
+      "attributes": {
+        "cells_not_processed": "00000000000000000000000000000001",
+        "src": "{workspace}/ov7670_controller.v:3.1-50.10"
+      },
+      "parameter_default_values": {
+        "CAMERA_ADDR": "01000010"
+      },
+      "ports": {
+        "clk_50": {
+          "direction": "input",
+          "bits": [ 2 ]
+        },
+        "clk_24": {
+          "direction": "input",
+          "bits": [ 3 ]
+        },
+        "resend": {
+          "direction": "input",
+          "bits": [ 4 ]
+        },
+        "config_finished": {
+          "direction": "output",
+          "bits": [ 5 ]
+        },
+        "sioc": {
+          "direction": "output",
+          "bits": [ 6 ]
+        },
+        "siod": {
+          "direction": "inout",
+          "bits": [ 7 ]
+        },
+        "reset": {
+          "direction": "output",
+          "bits": [ "1" ]
+        },
+        "pwdn": {
+          "direction": "output",
+          "bits": [ "0" ]
+        },
+        "xclk": {
+          "direction": "output",
+          "bits": [ 3 ]
+        }
+      },
+      "cells": {
+        "$not${workspace}/ov7670_controller.v:24$1": {
+          "hide_name": 1,
+          "type": "$not",
+          "parameters": {
+            "A_SIGNED": "00000000000000000000000000000000",
+            "A_WIDTH": "00000000000000000000000000000001",
+            "Y_WIDTH": "00000000000000000000000000000001"
+          },
+          "attributes": {
+            "src": "{workspace}/ov7670_controller.v:24.19-24.28"
+          },
+          "port_directions": {
+            "A": "input",
+            "Y": "output"
+          },
+          "connections": {
+            "A": [ 5 ],
+            "Y": [ 8 ]
+          }
+        },
+        "i2c_inst": {
+          "hide_name": 0,
+          "type": "i2c_sender",
+          "parameters": {
+          },
+          "attributes": {
+            "module_not_derived": "00000000000000000000000000000001",
+            "src": "{workspace}/ov7670_controller.v:30.16-39.6"
+          },
+          "port_directions": {
+            "clk_50": "input",
+            "data": "input",
+            "id": "input",
+            "send": "input",
+            "sioc": "output",
+            "siod": "inout",
+            "taken": "output",
+            "value": "input"
+          },
+          "connections": {
+            "clk_50": [ 2 ],
+            "data": [ 9, 10, 11, 12, 13, 14, 15, 16 ],
+            "id": [ "0", "1", "0", "0", "0", "0", "1", "0" ],
+            "send": [ 8 ],
+            "sioc": [ 6 ],
+            "siod": [ 7 ],
+            "taken": [ 17 ],
+            "value": [ 18, 19, 20, 21, 22, 23, 24, 25 ]
+          }
+        },
+        "reg_inst": {
+          "hide_name": 0,
+          "type": "ov7670_registers",
+          "parameters": {
+          },
+          "attributes": {
+            "module_not_derived": "00000000000000000000000000000001",
+            "src": "{workspace}/ov7670_controller.v:42.22-48.6"
+          },
+          "port_directions": {
+            "advance": "input",
+            "clk_50": "input",
+            "command": "output",
+            "finished": "output",
+            "resend": "input"
+          },
+          "connections": {
+            "advance": [ 17 ],
+            "clk_50": [ 2 ],
+            "command": [ 18, 19, 20, 21, 22, 23, 24, 25, 9, 10, 11, 12, 13, 14, 15, 16 ],
+            "finished": [ 5 ],
+            "resend": [ 4 ]
+          }
+        }
+      },
+      "netnames": {
+        "$not${workspace}/ov7670_controller.v:24$1_Y": {
+          "hide_name": 1,
+          "bits": [ 8 ],
+          "attributes": {
+            "src": "{workspace}/ov7670_controller.v:24.19-24.28"
+          }
+        },
+        "clk_24": {
+          "hide_name": 0,
+          "bits": [ 3 ],
+          "attributes": {
+            "src": "{workspace}/ov7670_controller.v:5.23-5.29"
+          }
+        },
+        "clk_50": {
+          "hide_name": 0,
+          "bits": [ 2 ],
+          "attributes": {
+            "src": "{workspace}/ov7670_controller.v:4.23-4.29"
+          }
+        },
+        "command": {
+          "hide_name": 0,
+          "bits": [ 18, 19, 20, 21, 22, 23, 24, 25, 9, 10, 11, 12, 13, 14, 15, 16 ],
+          "attributes": {
+            "src": "{workspace}/ov7670_controller.v:15.17-15.24"
+          }
+        },
+        "config_finished": {
+          "hide_name": 0,
+          "bits": [ 5 ],
+          "attributes": {
+            "src": "{workspace}/ov7670_controller.v:7.23-7.38"
+          }
+        },
+        "finished": {
+          "hide_name": 0,
+          "bits": [ 5 ],
+          "attributes": {
+            "src": "{workspace}/ov7670_controller.v:16.10-16.18"
+          }
+        },
+        "pwdn": {
+          "hide_name": 0,
+          "bits": [ "0" ],
+          "attributes": {
+            "src": "{workspace}/ov7670_controller.v:11.23-11.27"
+          }
+        },
+        "resend": {
+          "hide_name": 0,
+          "bits": [ 4 ],
+          "attributes": {
+            "src": "{workspace}/ov7670_controller.v:6.23-6.29"
+          }
+        },
+        "reset": {
+          "hide_name": 0,
+          "bits": [ "1" ],
+          "attributes": {
+            "src": "{workspace}/ov7670_controller.v:10.23-10.28"
+          }
+        },
+        "send": {
+          "hide_name": 0,
+          "bits": [ 8 ],
+          "attributes": {
+            "src": "{workspace}/ov7670_controller.v:18.10-18.14"
+          }
+        },
+        "sioc": {
+          "hide_name": 0,
+          "bits": [ 6 ],
+          "attributes": {
+            "src": "{workspace}/ov7670_controller.v:8.23-8.27"
+          }
+        },
+        "siod": {
+          "hide_name": 0,
+          "bits": [ 7 ],
+          "attributes": {
+            "src": "{workspace}/ov7670_controller.v:9.23-9.27"
+          }
+        },
+        "taken": {
+          "hide_name": 0,
+          "bits": [ 17 ],
+          "attributes": {
+            "src": "{workspace}/ov7670_controller.v:17.10-17.15"
+          }
+        },
+        "xclk": {
+          "hide_name": 0,
+          "bits": [ 3 ],
+          "attributes": {
+            "src": "{workspace}/ov7670_controller.v:12.23-12.27"
+          }
+        }
+      }
+    },
+    "ov7670_registers": {
+      "attributes": {
+        "cells_not_processed": "00000000000000000000000000000001",
+        "src": "{workspace}/ov7670_controller.v:117.1-207.10"
+      },
+      "ports": {
+        "clk_50": {
+          "direction": "input",
+          "bits": [ 2 ]
+        },
+        "resend": {
+          "direction": "input",
+          "bits": [ 3 ]
+        },
+        "advance": {
+          "direction": "input",
+          "bits": [ 4 ]
+        },
+        "command": {
+          "direction": "output",
+          "bits": [ 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20 ]
+        },
+        "finished": {
+          "direction": "output",
+          "bits": [ 21 ]
+        }
+      },
+      "cells": {
+        "$add${workspace}/ov7670_controller.v:134$26": {
+          "hide_name": 1,
+          "type": "$add",
+          "parameters": {
+            "A_SIGNED": "00000000000000000000000000000000",
+            "A_WIDTH": "00000000000000000000000000001000",
+            "B_SIGNED": "00000000000000000000000000000000",
+            "B_WIDTH": "00000000000000000000000000000001",
+            "Y_WIDTH": "00000000000000000000000000001000"
+          },
+          "attributes": {
+            "src": "{workspace}/ov7670_controller.v:134.24-134.38"
+          },
+          "port_directions": {
+            "A": "input",
+            "B": "input",
+            "Y": "output"
+          },
+          "connections": {
+            "A": [ 22, 23, 24, 25, 26, 27, 28, 29 ],
+            "B": [ "1" ],
+            "Y": [ 30, 31, 32, 33, 34, 35, 36, 37 ]
+          }
+        },
+        "$auto$mem.cc:282:emit$30": {
+          "hide_name": 1,
+          "type": "$memrd_v2",
+          "parameters": {
+            "ABITS": "00000000000000000000000000000110",
+            "ARST_VALUE": "xxxxxxxxxxxxxxxx",
+            "CE_OVER_SRST": "00000000000000000000000000000000",
+            "CLK_ENABLE": "00000000000000000000000000000000",
+            "CLK_POLARITY": "00000000000000000000000000000001",
+            "COLLISION_X_MASK": "",
+            "INIT_VALUE": "xxxxxxxxxxxxxxxx",
+            "MEMID": "$auto$proc_rom.cc:155:do_switch$29",
+            "SRST_VALUE": "xxxxxxxxxxxxxxxx",
+            "TRANSPARENCY_MASK": "",
+            "WIDTH": "00000000000000000000000000010000"
+          },
+          "attributes": {
+            "src": "{workspace}/ov7670_controller.v:138.9-205.16"
+          },
+          "port_directions": {
+            "ADDR": "input",
+            "ARST": "input",
+            "CLK": "input",
+            "DATA": "output",
+            "EN": "input",
+            "SRST": "input"
+          },
+          "connections": {
+            "ADDR": [ 22, 23, 24, 25, 26, 27 ],
+            "ARST": [ "0" ],
+            "CLK": [ "x" ],
+            "DATA": [ 38, 39, 40, 41, 42, 43, 44, 45, 46, 47, 48, 49, 50, 51, 52, 53 ],
+            "EN": [ "1" ],
+            "SRST": [ "0" ]
+          }
+        },
+        "$auto$mem.cc:328:emit$31": {
+          "hide_name": 1,
+          "type": "$meminit",
+          "parameters": {
+            "ABITS": "00000000000000000000000000100000",
+            "MEMID": "$auto$proc_rom.cc:155:do_switch$29",
+            "PRIORITY": "00000000000000000000000000000000",
+            "WIDTH": "00000000000000000000000000010000",
+            "WORDS": "00000000000000000000000001000000"
+          },
+          "attributes": {
+            "src": "{workspace}/ov7670_controller.v:138.9-205.16"
+          },
+          "port_directions": {
+            "ADDR": "input",
+            "DATA": "input"
+          },
+          "connections": {
+            "ADDR": [ "0", "0", "0", "0", "0", "0", "0", "0", "0", "0", "0", "0", "0", "0", "0", "0", "0", "0", "0", "0", "0", "0", "0", "0", "0", "0", "0", "0", "0", "0", "0", "0" ],
+            "DATA": [ "0", "0", "0", "0", "0", "0", "0", "1", "0", "1", "0", "0", "1", "0", "0", "0", "0", "0", "0", "0", "0", "0", "0", "1", "1", "0", "0", "0", "0", "0", "0", "0", "0", "0", "0", "0", "0", "1", "1", "0", "0", "1", "0", "0", "0", "0", "0", "0", "1", "1", "1", "0", "0", "1", "1", "1", "1", "1", "0", "0", "1", "0", "0", "0", "0", "0", "1", "0", "0", "0", "0", "0", "0", "1", "0", "0", "1", "0", "0", "0", "0", "0", "0", "0", "0", "0", "0", "0", "1", "0", "0", "0", "1", "0", "0", "0", "0", "0", "0", "0", "0", "0", "0", "0", "0", "0", "1", "1", "0", "0", "0", "0", "0", "0", "0", "0", "0", "0", "0", "0", "0", "1", "1", "1", "1", "1", "0", "0", "0", "0", "0", "0", "0", "0", "0", "0", "0", "0", "1", "0", "0", "0", "0", "0", "0", "0", "0", "0", "1", "0", "0", "0", "0", "0", "0", "0", "0", "0", "1", "0", "0", "0", "1", "0", "0", "0", "0", "0", "0", "1", "0", "1", "1", "1", "0", "0", "0", "0", "0", "1", "1", "1", "0", "0", "0", "0", "1", "0", "1", "0", "0", "0", "0", "0", "0", "0", "0", "0", "1", "0", "1", "1", "1", "1", "0", "0", "1", "0", "0", "0", "1", "0", "1", "1", "0", "0", "0", "0", "0", "0", "1", "0", "1", "0", "0", "0", "1", "1", "0", "0", "0", "0", "1", "0", "0", "0", "1", "0", "1", "0", "1", "1", "1", "0", "1", "0", "0", "0", "0", "1", "0", "0", "1", "0", "1", "0", "1", "0", "0", "1", "0", "1", "0", "0", "1", "1", "0", "0", "1", "0", "1", "0", "0", "0", "0", "0", "0", "0", "1", "0", "0", "0", "1", "0", "1", "0", "1", "0", "0", "1", "1", "1", "1", "0", "0", "0", "0", "0", "0", "1", "1", "0", "1", "0", "0", "0", "0", "0", "0", "0", "1", "1", "1", "0", "1", "1", "1", "1", "0", "0", "1", "0", "0", "0", "1", "0", "0", "0", "1", "1", "1", "0", "1", "0", "0", "0", "1", "0", "0", "0", "0", "1", "1", "0", "0", "0", "0", "1", "1", "0", "0", "0", "0", "0", "1", "0", "0", "1", "0", "1", "0", "1", "0", "0", "1", "1", "0", "0", "1", "1", "0", "0", "0", "0", "0", "0", "1", "0", "0", "1", "1", "0", "0", "0", "1", "1", "0", "1", "1", "1", "1", "0", "0", "1", "0", "1", "1", "0", "0", "0", "0", "1", "0", "1", "0", "0", "0", "0", "1", "1", "0", "0", "0", "0", "0", "0", "1", "0", "0", "0", "0", "1", "1", "0", "0", "1", "1", "1", "0", "0", "0", "0", "1", "1", "0", "1", "0", "0", "1", "0", "1", "1", "1", "1", "0", "0", "0", "0", "0", "1", "0", "0", "0", "0", "0", "0", "0", "1", "1", "0", "1", "0", "0", "0", "1", "1", "1", "0", "1", "1", "0", "0", "0", "1", "1", "1", "1", "0", "0", "0", "0", "1", "0", "0", "0", "0", "0", "0", "1", "0", "0", "0", "0", "1", "0", "0", "1", "0", "0", "0", "1", "0", "0", "1", "0", "1", "0", "0", "0", "1", "0", "0", "1", "1", "1", "0", "0", "0", "0", "0", "1", "0", "0", "1", "0", "1", "0", "0", "1", "1", "0", "1", "0", "0", "0", "0", "1", "1", "0", "0", "1", "1", "0", "0", "1", "1", "0", "1", "0", "0", "0", "0", "1", "0", "1", "0", "1", "1", "0", "0", "1", "0", "1", "1", "1", "0", "0", "0", "1", "1", "1", "0", "1", "1", "0", "0", "1", "0", "0", "0", "1", "1", "1", "0", "0", "0", "0", "1", "1", "1", "0", "0", "0", "1", "0", "1", "0", "1", "0", "0", "1", "0", "0", "1", "1", "1", "0", "0", "0", "0", "0", "1", "1", "1", "1", "0", "0", "0", "1", "1", "1", "1", "0", "0", "0", "0", "0", "0", "0", "0", "1", "0", "1", "0", "1", "1", "0", "0", "1", "0", "0", "0", "0", "0", "0", "1", "0", "0", "0", "1", "1", "1", "0", "0", "1", "0", "0", "0", "0", "0", "0", "0", "0", "0", "1", "0", "0", "1", "0", "1", "1", "0", "0", "1", "0", "1", "0", "0", "1", "0", "1", "1", "0", "1", "0", "1", "1", "0", "0", "0", "0", "0", "1", "0", "0", "0", "0", "0", "1", "0", "1", "1", "1", "0", "1", "1", "1", "1", "0", "0", "1", "0", "1", "0", "1", "1", "0", "0", "0", "1", "0", "0", "0", "0", "0", "0", "0", "0", "0", "1", "1", "1", "0", "0", "0", "1", "0", "0", "0", "0", "0", "0", "0", "0", "1", "1", "1", "1", "0", "0", "0", "1", "0", "0", "0", "0", "0", "0", "0", "0", "0", "0", "0", "0", "1", "0", "0", "1", "0", "0", "0", "0", "0", "0", "0", "0", "1", "0", "0", "0", "1", "0", "0", "1", "0", "0", "0", "0", "0", "0", "0", "0", "0", "1", "1", "0", "1", "0", "0", "1", "0", "0", "0", "0", "0", "0", "0", "0", "0", "1", "0", "1", "1", "0", "0", "1", "0", "0", "1", "0", "0", "0", "0", "1", "0", "0", "0", "0", "1", "1", "0", "1", "0", "0", "1", "1", "0", "0", "0", "0", "1", "0", "0", "0", "1", "1", "0", "1", "0", "1", "1", "1", "0", "0", "0", "0", "0", "1", "0", "0", "1", "1", "0", "1", "0", "1", "0", "0", "0", "0", "0", "1", "1", "1", "0", "0", "1", "1", "0", "1", "0", "1", "0", "1", "0", "0", "0", "0", "0", "0", "0", "1", "1", "1", "0", "1", "0", "0", "0", "0", "0", "0", "1", "0", "0", "1", "1", "0", "1", "0", "1", "0", "0", "0", "0", "0", "0", "0", "0", "0", "1", "0", "1", "0", "1", "0", "1", "0", "1", "1", "1", "1", "1", "1", "1", "1", "1", "1", "1", "1", "1", "1", "1", "1", "1", "1", "1", "1", "1", "1", "1", "1", "1", "1", "1", "1", "1", "1", "1", "1", "1", "1", "1", "1", "1", "1", "1", "1", "1", "1", "1", "1", "1", "1", "1", "1", "1", "1", "1", "1", "1", "1", "1", "1", "1", "1", "1", "1", "1", "1", "1", "1", "1", "1", "1", "1", "1", "1", "1", "1", "1", "1", "1", "1", "1", "1", "1", "1", "1", "1", "1", "1", "1", "1", "1", "1", "1", "1", "1", "1", "1", "1", "1", "1" ]
+          }
+        },
+        "$eq${workspace}/ov7670_controller.v:127$24": {
+          "hide_name": 1,
+          "type": "$eq",
+          "parameters": {
+            "A_SIGNED": "00000000000000000000000000000000",
+            "A_WIDTH": "00000000000000000000000000010000",
+            "B_SIGNED": "00000000000000000000000000000000",
+            "B_WIDTH": "00000000000000000000000000010000",
+            "Y_WIDTH": "00000000000000000000000000000001"
+          },
+          "attributes": {
+            "src": "{workspace}/ov7670_controller.v:127.24-127.43"
+          },
+          "port_directions": {
+            "A": "input",
+            "B": "input",
+            "Y": "output"
+          },
+          "connections": {
+            "A": [ 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20 ],
+            "B": [ "1", "1", "1", "1", "1", "1", "1", "1", "1", "1", "1", "1", "1", "1", "1", "1" ],
+            "Y": [ 21 ]
+          }
+        },
+        "$procdff$92": {
+          "hide_name": 1,
+          "type": "$dff",
+          "parameters": {
+            "CLK_POLARITY": "1",
+            "WIDTH": "00000000000000000000000000010000"
+          },
+          "attributes": {
+            "src": "{workspace}/ov7670_controller.v:129.5-206.8"
+          },
+          "port_directions": {
+            "CLK": "input",
+            "D": "input",
+            "Q": "output"
+          },
+          "connections": {
+            "CLK": [ 2 ],
+            "D": [ 54, 55, 56, 57, 58, 59, 60, 61, 62, 63, 64, 65, 66, 67, 68, 69 ],
+            "Q": [ 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20 ]
+          }
+        },
+        "$procdff$93": {
+          "hide_name": 1,
+          "type": "$dff",
+          "parameters": {
+            "CLK_POLARITY": "1",
+            "WIDTH": "00000000000000000000000000001000"
+          },
+          "attributes": {
+            "src": "{workspace}/ov7670_controller.v:129.5-206.8"
+          },
+          "port_directions": {
+            "CLK": "input",
+            "D": "input",
+            "Q": "output"
+          },
+          "connections": {
+            "CLK": [ 2 ],
+            "D": [ 70, 71, 72, 73, 74, 75, 76, 77 ],
+            "Q": [ 22, 23, 24, 25, 26, 27, 28, 29 ]
+          }
+        },
+        "$procmux$33": {
+          "hide_name": 1,
+          "type": "$mux",
+          "parameters": {
+            "WIDTH": "00000000000000000000000000010000"
+          },
+          "attributes": {
+            "full_case": "00000000000000000000000000000001",
+            "src": "{workspace}/ov7670_controller.v:138.9-205.16"
+          },
+          "port_directions": {
+            "A": "input",
+            "B": "input",
+            "S": "input",
+            "Y": "output"
+          },
+          "connections": {
+            "A": [ "1", "1", "1", "1", "1", "1", "1", "1", "1", "1", "1", "1", "1", "1", "1", "1" ],
+            "B": [ 38, 39, 40, 41, 42, 43, 44, 45, 46, 47, 48, 49, 50, 51, 52, 53 ],
+            "S": [ 78 ],
+            "Y": [ 54, 55, 56, 57, 58, 59, 60, 61, 62, 63, 64, 65, 66, 67, 68, 69 ]
+          }
+        },
+        "$procmux$34_CMP0": {
+          "hide_name": 1,
+          "type": "$logic_not",
+          "parameters": {
+            "A_SIGNED": "00000000000000000000000000000000",
+            "A_WIDTH": "00000000000000000000000000000010",
+            "Y_WIDTH": "00000000000000000000000000000001"
+          },
+          "attributes": {
+            "full_case": "00000000000000000000000000000001",
+            "src": "{workspace}/ov7670_controller.v:138.9-205.16"
+          },
+          "port_directions": {
+            "A": "input",
+            "Y": "output"
+          },
+          "connections": {
+            "A": [ 28, 29 ],
+            "Y": [ 78 ]
+          }
+        },
+        "$procmux$35": {
+          "hide_name": 1,
+          "type": "$mux",
+          "parameters": {
+            "WIDTH": "00000000000000000000000000001000"
+          },
+          "attributes": {
+            "src": "{workspace}/ov7670_controller.v:133.22-133.29|{workspace}/ov7670_controller.v:133.18-135.12"
+          },
+          "port_directions": {
+            "A": "input",
+            "B": "input",
+            "S": "input",
+            "Y": "output"
+          },
+          "connections": {
+            "A": [ 22, 23, 24, 25, 26, 27, 28, 29 ],
+            "B": [ 30, 31, 32, 33, 34, 35, 36, 37 ],
+            "S": [ 4 ],
+            "Y": [ 79, 80, 81, 82, 83, 84, 85, 86 ]
+          }
+        },
+        "$procmux$38": {
+          "hide_name": 1,
+          "type": "$mux",
+          "parameters": {
+            "WIDTH": "00000000000000000000000000001000"
+          },
+          "attributes": {
+            "full_case": "00000000000000000000000000000001",
+            "src": "{workspace}/ov7670_controller.v:131.13-131.19|{workspace}/ov7670_controller.v:131.9-135.12"
+          },
+          "port_directions": {
+            "A": "input",
+            "B": "input",
+            "S": "input",
+            "Y": "output"
+          },
+          "connections": {
+            "A": [ 79, 80, 81, 82, 83, 84, 85, 86 ],
+            "B": [ "0", "0", "0", "0", "0", "0", "0", "0" ],
+            "S": [ 3 ],
+            "Y": [ 70, 71, 72, 73, 74, 75, 76, 77 ]
+          }
+        }
+      },
+      "memories": {
+        "$auto$proc_rom.cc:155:do_switch$29": {
+          "hide_name": 1,
+          "attributes": {
+            "full_case": "00000000000000000000000000000001",
+            "src": "{workspace}/ov7670_controller.v:138.9-205.16"
+          },
+          "width": 16,
+          "start_offset": 0,
+          "size": 64
+        }
+      },
+      "netnames": {
+        "$0\\address[7:0]": {
+          "hide_name": 1,
+          "bits": [ 70, 71, 72, 73, 74, 75, 76, 77 ],
+          "attributes": {
+            "src": "{workspace}/ov7670_controller.v:129.5-206.8"
+          }
+        },
+        "$0\\command[15:0]": {
+          "hide_name": 1,
+          "bits": [ 54, 55, 56, 57, 58, 59, 60, 61, 62, 63, 64, 65, 66, 67, 68, 69 ],
+          "attributes": {
+            "src": "{workspace}/ov7670_controller.v:129.5-206.8"
+          }
+        },
+        "$1\\address[7:0]": {
+          "hide_name": 1,
+          "bits": [ "0", "0", "0", "0", "0", "0", "0", "0" ],
+          "attributes": {
+            "src": "{workspace}/ov7670_controller.v:125.15-125.30"
+          }
+        },
+        "$add${workspace}/ov7670_controller.v:134$26_Y": {
+          "hide_name": 1,
+          "bits": [ 30, 31, 32, 33, 34, 35, 36, 37 ],
+          "attributes": {
+            "src": "{workspace}/ov7670_controller.v:134.24-134.38"
+          }
+        },
+        "$auto$proc_rom.cc:154:do_switch$28": {
+          "hide_name": 1,
+          "bits": [ 38, 39, 40, 41, 42, 43, 44, 45, 46, 47, 48, 49, 50, 51, 52, 53 ],
+          "attributes": {
+          }
+        },
+        "$eq${workspace}/ov7670_controller.v:127$24_Y": {
+          "hide_name": 1,
+          "bits": [ 21 ],
+          "attributes": {
+            "src": "{workspace}/ov7670_controller.v:127.24-127.43"
+          }
+        },
+        "$procmux$33_Y": {
+          "hide_name": 1,
+          "bits": [ 54, 55, 56, 57, 58, 59, 60, 61, 62, 63, 64, 65, 66, 67, 68, 69 ],
+          "attributes": {
+          }
+        },
+        "$procmux$34_CMP": {
+          "hide_name": 1,
+          "bits": [ 78 ],
+          "attributes": {
+          }
+        },
+        "$procmux$35_Y": {
+          "hide_name": 1,
+          "bits": [ 79, 80, 81, 82, 83, 84, 85, 86 ],
+          "attributes": {
+          }
+        },
+        "$procmux$36_CMP": {
+          "hide_name": 1,
+          "bits": [ 4 ],
+          "attributes": {
+          }
+        },
+        "$procmux$38_Y": {
+          "hide_name": 1,
+          "bits": [ 70, 71, 72, 73, 74, 75, 76, 77 ],
+          "attributes": {
+          }
+        },
+        "$procmux$39_CMP": {
+          "hide_name": 1,
+          "bits": [ 3 ],
+          "attributes": {
+          }
+        },
+        "address": {
+          "hide_name": 0,
+          "bits": [ 22, 23, 24, 25, 26, 27, 28, 29 ],
+          "attributes": {
+            "init": "00000000",
+            "src": "{workspace}/ov7670_controller.v:125.15-125.22"
+          }
+        },
+        "advance": {
+          "hide_name": 0,
+          "bits": [ 4 ],
+          "attributes": {
+            "src": "{workspace}/ov7670_controller.v:120.24-120.31"
+          }
+        },
+        "clk_50": {
+          "hide_name": 0,
+          "bits": [ 2 ],
+          "attributes": {
+            "src": "{workspace}/ov7670_controller.v:118.24-118.30"
+          }
+        },
+        "command": {
+          "hide_name": 0,
+          "bits": [ 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20 ],
+          "attributes": {
+            "src": "{workspace}/ov7670_controller.v:121.24-121.31"
+          }
+        },
+        "finished": {
+          "hide_name": 0,
+          "bits": [ 21 ],
+          "attributes": {
+            "src": "{workspace}/ov7670_controller.v:122.24-122.32"
+          }
+        },
+        "resend": {
+          "hide_name": 0,
+          "bits": [ 3 ],
+          "attributes": {
+            "src": "{workspace}/ov7670_controller.v:119.24-119.30"
+          }
+        }
+      }
+    }
+  }
+}
