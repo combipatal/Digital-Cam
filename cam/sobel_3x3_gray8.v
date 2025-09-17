@@ -121,7 +121,7 @@ module sobel_3x3_gray8 (
             end
             sobel_ready <= 1'b1;
         end else begin
-            pixel_out   <= 8'h00;
+            pixel_out   <= 8'h00;  // 초기화 중 또는 비활성 영역에서 검은색
             sobel_ready <= 1'b0;
         end
     end

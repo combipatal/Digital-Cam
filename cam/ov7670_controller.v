@@ -200,7 +200,7 @@ module ov7670_registers (
             8'h36: command <= 16'hB382; // 일반 설정
             8'h37: command <= 16'hB80A; // 일반 설정
             8'h38: command <= 16'h5640; // CONTRAS: 대비 설정
-			8'h39: command <= 16'h5510; // BRIGHT: 밝기 설정 (기본값 0x00)
+			8'h39: command <= 16'h5500; // BRIGHT: 밝기 설정 (기본값 0x00)
             default: command <= 16'hFFFF;  // 설정 완료 표시
         endcase
     end
