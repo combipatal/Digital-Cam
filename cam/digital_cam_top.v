@@ -1,6 +1,6 @@
 // OV7670 카메라 인터페이스 최상위 모듈
 // 카메라 캡처, 프레임 버퍼, VGA 디스플레이를 통합한 메인 모듈
-module   (
+module digital_cam_top (
     input  wire        clk_50,         // 50MHz 시스템 클럭
     input  wire        btn_resend,     // 카메라 설정 재시작 버튼
     input  wire        sw_grayscale,   // SW[0] 그레이스케일 모드 스위치
@@ -76,7 +76,7 @@ module   (
     
     // 신호 연결
     assign resend = btn_rising_edge;  // 버튼 상승 에지에서 리셋 펄스 전송
-    assign vga_vsync = vSync;         // VGA 수직 동기화 연결
+    // vSync는 내부 파이프라인 정렬에 사용
     assign vga_blank_N = nBlank;      // VGA 블랭킹 신호 연결
     
     // 듀얼 프레임 버퍼 - 320x240 = 76800 픽셀을 두 개의 RAM으로 분할
@@ -85,7 +85,8 @@ module   (
     
     // 쓰기 주소 할당
     assign wraddress_ram1 = wraddress[15:0];  // RAM1: 0-32767 (16비트)
-    assign wraddress_ram2 = wraddress[15:0] - 16'd32768;  // RAM2: 0-44031 (원복)
+    wire [16:0] wraddr_sub = wraddress - 17'd32768;
+    assign wraddress_ram2 = wraddr_sub[15:0];  // RAM2: 0-44031 (정상 오프셋)
     assign wrdata_ram1 = wrdata;              // RAM1 쓰기 데이터
     assign wrdata_ram2 = wrdata;              // RAM2 쓰기 데이터
     assign wren_ram1 = wren & ~wraddress[16]; // 주소 < 32768일 때 RAM1에 쓰기
@@ -93,7 +94,8 @@ module   (
     
     // 읽기 주소 할당
     assign rdaddress_ram1 = rdaddress[15:0];  // RAM1: 0-32767 (16비트)
-    assign rdaddress_ram2 = rdaddress[15:0] - 16'd32768;  // RAM2: 0-44031 (원복)
+    wire [16:0] rdaddr_sub = rdaddress - 17'd32768;
+    assign rdaddress_ram2 = rdaddr_sub[15:0];  // RAM2: 0-44031 (정상 오프셋)
     
     // 읽기 데이터 멀티플렉싱 - 상위 비트에 따라 어느 RAM에서 읽을지 결정
     assign rddata = rdaddress[16] ? rddata_ram2 : rddata_ram1;
@@ -111,9 +113,9 @@ module   (
     // RGB888: R[7:0] G[7:0] B[7:0]
     wire [7:0] r_888, g_888, b_888;  // RGB888로 확장된 값들
     
-    assign r_888 = {rddata[15:11], 3'b111};  // 5비트 → 8비트 (x8 + 7) - 더 밝게
-    assign g_888 = {rddata[10:5], 2'b11};    // 6비트 → 8비트 (x4 + 3) - 더 밝게
-    assign b_888 = {rddata[4:0], 3'b111};    // 5비트 → 8비트 (x8 + 7) - 더 밝게
+    assign r_888 = {rddata[15:11], rddata[15:13]};  // 5비트 → 8비트 비트복제
+    assign g_888 = {rddata[10:5],  rddata[10:9]};   // 6비트 → 8비트 비트복제
+    assign b_888 = {rddata[4:0],   rddata[4:2]};    // 5비트 → 8비트 비트복제
     
     // RGB888을 하나의 24비트 픽셀로 결합 (필터 입력용)
     wire [23:0] rgb888_pixel = {r_888, g_888, b_888};
@@ -132,9 +134,9 @@ module   (
     wire [7:0] filter_r_888, filter_g_888, filter_b_888;
 
     // 파이프라인 지연: 경로별 상이
-    // - 가우시안: 2클럭, 소벨 추가: 2클럭 → 총 4클럭
-    localparam integer GAUSS_LAT = 2'b10;
-    localparam integer SOBEL_EXTRA_LAT = 2'b00;
+    // - 가우시안: 2클럭, 소벨 추가: 2클럭 → 총 4클럭 (소벨이 최대)
+    localparam integer GAUSS_LAT = 2;
+    localparam integer SOBEL_EXTRA_LAT = 2;
     localparam integer PIPE_LATENCY = GAUSS_LAT + SOBEL_EXTRA_LAT; // 4
     reg [16:0] rdaddress_delayed [PIPE_LATENCY:0];      // rdaddress delayed value
     reg activeArea_delayed [PIPE_LATENCY:0];            // active area delayed value
@@ -254,7 +256,7 @@ module   (
     localparam integer IDX_ORIG  = 0;
     localparam integer IDX_GRAY  = 0;
     localparam integer IDX_GAUSS = GAUSS_LAT;                    // 2
-    localparam integer IDX_SOBEL = GAUSS_LAT + SOBEL_EXTRA_LAT;  // 4
+    localparam integer IDX_SOBEL = GAUSS_LAT + SOBEL_EXTRA_LAT;  // 2
 
     // 최종 출력 선택(경로별 인덱스 및 ready 게이팅)
     wire [7:0] sel_orig_r = activeArea_delayed[IDX_ORIG] ? red_value_delayed[IDX_ORIG] : 8'h00;
@@ -293,18 +295,32 @@ module   (
 
     );
     
+    // VGA 동기화 신호 지연용 원본 신호
+    wire hsync_raw, vsync_raw;
+
     // VGA 컨트롤러
     VGA vga_inst (
         .CLK25(clk_25_vga),        // 25MHz VGA 클럭
         .pixel_data(rddata),       // 픽셀 데이터 입력
         .clkout(vga_CLK),          // VGA 클럭 출력
-        .Hsync(vga_hsync),         // 수평 동기화
-        .Vsync(vSync),             // 수직 동기화
+        .Hsync(hsync_raw),         // 수평 동기화 (원본)
+        .Vsync(vsync_raw),         // 수직 동기화 (원본)
         .Nblank(nBlank),           // 블랭킹 신호
         .Nsync(vga_sync_N),        // 동기화 신호
         .activeArea(activeArea),   // 활성 영역
         .pixel_address(rdaddress)  // 픽셀 주소 출력
     );
+
+    // Hsync/Vsync를 데이터 경로 지연과 일치시키기 위한 파이프라인 (4클럭 지연)
+    reg [3:0] hsync_delay_pipe = 4'b0;
+    reg [3:0] vsync_delay_pipe = 4'b0;
+    always @(posedge clk_25_vga) begin
+        hsync_delay_pipe <= {hsync_delay_pipe[2:0], hsync_raw};
+        vsync_delay_pipe <= {vsync_delay_pipe[2:0], vsync_raw};
+    end
+
+    assign vga_hsync = hsync_delay_pipe[3];
+    assign vga_vsync = vsync_delay_pipe[3];
     
     // OV7670 카메라 컨트롤러
     ov7670_controller camera_ctrl (
@@ -320,7 +336,12 @@ module   (
     );
     
     // OV7670 캡처 모듈
-    ov7670_capture capture_inst (
+    ov7670_capture #(
+        .H_SKIP_LEFT(8),
+        .H_SKIP_RIGHT(8),
+        .V_SKIP_TOP(4),
+        .V_SKIP_BOTTOM(4)
+    ) capture_inst (
         .pclk(ov7670_pclk),        // 픽셀 클럭
         .vsync(ov7670_vsync),      // 수직 동기화
         .href(ov7670_href),        // 수평 참조
@@ -330,6 +351,10 @@ module   (
         .we(wren)                  // RAM 쓰기 활성화
     );
     
+    // VGA 주소를 4클럭 지연시켜 필터 지연과 동기화
+    // 초기 4클럭 동안은 0번지 사용 (오버플로우 방지)
+    wire [16:0] rdaddress_sync = (rdaddress < 4) ? 17'h00000 : rdaddress - 4;
+
     // 듀얼 프레임 버퍼 RAM들 - 각각 32K x 12비트로 구성
     // RAM1: 이미지의 첫 번째 절반 저장 (픽셀 0-32767)
     frame_buffer_ram buffer_ram1 (
@@ -337,7 +362,7 @@ module   (
         .wraddress(wraddress_ram1), // 쓰기 주소
         .wrclock(ov7670_pclk),      // 쓰기 클럭 (카메라 픽셀 클럭)
         .wren(wren_ram1),           // 쓰기 활성화
-        .rdaddress(rdaddress_sync[15:0]), // 읽기 주소 (3클럭 지연)
+        .rdaddress(rdaddress_sync[15:0]), // 읽기 주소 (4클럭 지연)
         .rdclock(clk_25_vga),       // 읽기 클럭 (VGA 클럭)
         .q(rddata_ram1)             // 읽기 데이터
     );
@@ -348,13 +373,11 @@ module   (
         .wraddress(wraddress_ram2), // 쓰기 주소
         .wrclock(ov7670_pclk),      // 쓰기 클럭 (카메라 픽셀 클럭)
         .wren(wren_ram2),           // 쓰기 활성화
-        .rdaddress(rdaddress_sync[15:0]), // 읽기 주소 (3클럭 지연)
+        .rdaddress(rdaddress_sync[15:0]), // 읽기 주소 (4클럭 지연)
         .rdclock(clk_25_vga),       // 읽기 클럭 (VGA 클럭)
         .q(rddata_ram2)             // 읽기 데이터
     );
     
-    // VGA 주소를 3클럭 지연시켜 필터 지연과 동기화
-    // 초기 3클럭 동안은 0번지 사용 (오버플로우 방지)
-    wire [16:0] rdaddress_sync = (rdaddress < 3) ? 17'h00000 : rdaddress - 3;
+    
     
 endmodule

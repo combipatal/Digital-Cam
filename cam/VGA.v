@@ -1,6 +1,5 @@
 // VGA 컨트롤러 - 640x480 @ 60Hz, 25MHz 픽셀 클럭
 module VGA (
-    input  wire clk_25_vga,    // 25MHz 클럭 입력
     input  wire CLK25,         // 25MHz 클럭 입력
     input  wire [15:0] pixel_data, // 픽셀 데이터 입력
     output wire clkout,        // ADV7123 및 TFT 화면용 클럭 출력
@@ -35,7 +34,7 @@ module VGA (
     assign pixel_address = pixel_addr;
     
     // 320x240 윈도우를 위한 픽셀 카운팅
-    always @(posedge clk_25_vga) begin
+    always @(posedge CLK25) begin
         if (Hcnt == HM) begin  // 라인 끝
             Hcnt <= 10'd0;     // 수평 카운터 리셋
             if (Vcnt == VM) begin  // 프레임 끝
@@ -48,8 +47,8 @@ module VGA (
             Hcnt <= Hcnt + 1'b1;  // 수평 카운터 증가
         end
         
-        // 픽셀 주소 카운팅 (320x240 영역에서만)
-        if ((Hcnt < 320) && (Vcnt < 240)) begin
+        // 픽셀 주소 카운팅 (중앙 320x240 활성 영역에서만)
+        if ((Hcnt >= 10'd160 && Hcnt < 10'd480) && (Vcnt >= 10'd120 && Vcnt < 10'd360)) begin
             if (pixel_addr < 17'd76799) begin
                 pixel_addr <= pixel_addr + 1'b1;  // 다음 픽셀 주소
             end
@@ -57,7 +56,7 @@ module VGA (
     end
     
     // 320x240 윈도우를 위한 활성 영역 생성 (중앙 정렬: (160,120) 시작)
-    always @(posedge clk_25_vga) begin
+    always @(posedge CLK25) begin
         if ((Hcnt >= 10'd160 && Hcnt < 10'd480) && (Vcnt >= 10'd120 && Vcnt < 10'd360)) begin
             activeArea <= 1'b1;  // 활성 영역
         end else begin
@@ -66,7 +65,7 @@ module VGA (
     end
     
     // 수평 동기화 생성
-    always @(posedge clk_25_vga) begin
+    always @(posedge CLK25) begin
         if (Hcnt >= (HD + HF) && Hcnt <= (HD + HF + HR - 1))  // 656~751 구간
             Hsync <= 1'b0;  // 수평 동기화 활성 (로우)
         else
@@ -74,7 +73,7 @@ module VGA (
     end
     
     // 수직 동기화 생성
-    always @(posedge clk_25_vga) begin
+    always @(posedge CLK25) begin
         if (Vcnt >= (VD + VF) && Vcnt <= (VD + VF + VR - 1))  // 490~491 구간
             Vsync <= 1'b0;  // 수직 동기화 활성 (로우)
         else
@@ -85,6 +84,6 @@ module VGA (
     assign Nsync = 1'b1;  // TFT 동기화 신호 (항상 하이)
     assign video = (Hcnt < HD) && (Vcnt < VD);  // 전체 640x480 해상도
     assign Nblank = video;  // 블랭킹 신호 (비디오 활성과 동일)
-    assign clkout = clk_25_vga;  // 클럭 출력
+    assign clkout = CLK25;  // 클럭 출력
     
 endmodule

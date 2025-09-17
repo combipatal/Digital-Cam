@@ -12,8 +12,10 @@ module gaussian_3x3_gray8 (
 
     // init and vsync edge
     reg vsync_prev = 1'b0;
+    reg active_prev = 1'b0;
     always @(posedge clk) begin
         vsync_prev <= vsync;
+        active_prev <= active_area;
     end
 
     reg        reset_done = 1'b0;
@@ -42,7 +44,8 @@ module gaussian_3x3_gray8 (
 
     // line/window maintenance
     always @(posedge clk) begin
-        if (vsync && !vsync_prev) begin
+        // 프레임 시작 또는 라인 시작 시 윈도우 초기화
+        if ((vsync && !vsync_prev) || (active_area && !active_prev)) begin
             reset_done   <= 1'b0;
             init_counter <= 3'd0;
             cache1[0] <= 8'h00; cache1[1] <= 8'h00; cache1[2] <= 8'h00;

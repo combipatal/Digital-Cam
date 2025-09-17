@@ -12,8 +12,20 @@ module sobel_3x3_gray8 (
 
     // init and vsync edge
     reg vsync_prev = 1'b0;
+    reg active_prev = 1'b0;
     always @(posedge clk) begin
         vsync_prev <= vsync;
+        active_prev <= active_area;
+    end
+
+    // per-line horizontal position within active_area (0..319)
+    reg [9:0] hpos = 10'd0;
+    always @(posedge clk) begin
+        if (active_area && !active_prev) begin
+            hpos <= 10'd0; // start of active line
+        end else if (enable && active_area) begin
+            if (hpos < 10'd1023) hpos <= hpos + 1'b1;
+        end
     end
 
     reg        reset_done = 1'b0;
@@ -38,7 +50,8 @@ module sobel_3x3_gray8 (
 
     // line/window maintenance
     always @(posedge clk) begin
-        if (vsync && !vsync_prev) begin
+        // 프레임 시작 또는 라인 시작 시 윈도우 초기화
+        if ((vsync && !vsync_prev) || (active_area && !active_prev)) begin
             reset_done   <= 1'b0;
             init_counter <= 3'd0;
             cache1[0] <= 8'h00; cache1[1] <= 8'h00; cache1[2] <= 8'h00;
@@ -81,6 +94,9 @@ module sobel_3x3_gray8 (
         end
     end
 
+    // Ensure left halo is available: suppress first 2 pixels each line
+    wire window_valid = enable && reset_done && valid_addr && active_area && (hpos >= 10'd2);
+
     // sobel compute (1 clock)
     // Gx = [-1 0 +1; -2 0 +2; -1 0 +1]
     // Gy = [+1 +2 +1;  0 0  0; -1 -2 -1]
@@ -93,7 +109,7 @@ module sobel_3x3_gray8 (
     wire [10:0] gy_pos = {3'b000,p00} + {2'b00,p01,1'b0} + {3'b000,p02};
     wire [10:0] gy_neg = {3'b000,p20} + {2'b00,p21,1'b0} + {3'b000,p22};
     always @(posedge clk) begin
-        if (enable && reset_done && valid_addr && active_area) begin
+        if (window_valid) begin
             // compute |gx| and |gy| using precomputed wires
             gx_abs <= (gx_pos >= gx_neg) ? (gx_pos - gx_neg) : (gx_neg - gx_pos);
             gy_abs <= (gy_pos >= gy_neg) ? (gy_pos - gy_neg) : (gy_neg - gy_pos);
@@ -108,7 +124,7 @@ module sobel_3x3_gray8 (
 
     // clamp & output (임계값 하향/완화)
     always @(posedge clk) begin
-        if (enable && reset_done && valid_addr && active_area) begin
+        if (window_valid) begin
             // 이전: 포화 조건이 낮아 암부가 쉽게 0에 가까워졌음
             // 변경: 소프트 임계 + 약한 감마 보정
             // 1) 소프트 컷: 4를 빼고 하한 0 고정
