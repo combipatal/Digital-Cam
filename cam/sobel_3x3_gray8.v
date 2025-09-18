@@ -19,12 +19,12 @@ module sobel_3x3_gray8 (
     end
 
     // per-line horizontal position within active_area (0..319)
-    reg [9:0] hpos = 10'd0;
+    reg [8:0] hpos = 9'd0;  // 9비트로 충분 (0~319)
     always @(posedge clk) begin
         if (active_area && !active_prev) begin
-            hpos <= 10'd0; // start of active line
+            hpos <= 9'd0; // start of active line
         end else if (enable && active_area) begin
-            if (hpos < 10'd1023) hpos <= hpos + 1'b1;
+            if (hpos < 9'd319) hpos <= hpos + 1'b1;  // 320픽셀까지만 카운팅
         end
     end
 

@@ -114,31 +114,3 @@ module ov7670_capture (
     end
     
 endmodule
-
-// VGA 디스플레이용 주소 생성기 모듈
-module Address_Generator (
-    input  wire        clk_25_vga,// 25MHz VGA 클럭
-    input  wire        enable,    // 주소 생성 활성화 신호
-    input  wire        vsync,     // 수직 동기화 신호
-    output wire [16:0] address    // RAM 읽기 주소
-);
-
-    reg [16:0] val = 17'h00000;  // 주소 카운터
-    
-    assign address = val;  // 주소 출력
-    
-    always @(posedge clk_25_vga) begin
-        if (enable == 1'b1) begin  // 활성 영역에서만 주소 증가
-            // 320x240 = 76800 픽셀
-            if (val < 76800) begin
-                val <= val + 1'b1;  // 다음 픽셀 주소로
-            end
-        end
-        
-        // VSYNC에서 주소 리셋 - 새 프레임 시작 (액티브 로우)
-        if (vsync == 1'b0) begin
-            val <= 17'h00000;  // 첫 번째 픽셀부터 시작
-        end
-    end
-    
-endmodule                                             

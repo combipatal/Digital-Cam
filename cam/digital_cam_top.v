@@ -153,7 +153,7 @@ module digital_cam_top (
     reg       sobel_ready_delayed  [PIPE_LATENCY:0];     // sobel ready delayed
     integer i; 
     
-	 // 파이프라인 정렬: 정상 상태 기준 PIPE_LATENCY 클럭 지연 체인
+	// 파이프라인 정렬: 정상 상태 기준 PIPE_LATENCY 클럭 지연 체인
     always @(posedge clk_25_vga) begin
         // 프레임 시작(Vsync 로우) 시 모든 지연 레지스터 클리어
         if (vSync == 1'b0) begin
@@ -253,10 +253,10 @@ module digital_cam_top (
     assign filter_b_888 = filtered_pixel[7:0];    // B 채널
     
     // 경로별 지연 인덱스
-    localparam integer IDX_ORIG  = 0;
-    localparam integer IDX_GRAY  = 0;
-    localparam integer IDX_GAUSS = GAUSS_LAT;                    // 2
-    localparam integer IDX_SOBEL = GAUSS_LAT + SOBEL_EXTRA_LAT;  // 2
+    localparam integer IDX_ORIG  = PIPE_LATENCY;    //4
+    localparam integer IDX_GRAY  = PIPE_LATENCY;    //4
+    localparam integer IDX_GAUSS = PIPE_LATENCY - GAUSS_LAT;        // 2
+    localparam integer IDX_SOBEL = 0;                              // 0 
 
     // 최종 출력 선택(경로별 인덱스 및 ready 게이팅)
     wire [7:0] sel_orig_r = activeArea_delayed[IDX_ORIG] ? red_value_delayed[IDX_ORIG] : 8'h00;
@@ -351,9 +351,8 @@ module digital_cam_top (
         .we(wren)                  // RAM 쓰기 활성화
     );
     
-    // VGA 주소를 4클럭 지연시켜 필터 지연과 동기화
-    // 초기 4클럭 동안은 0번지 사용 (오버플로우 방지)
-    wire [16:0] rdaddress_sync = (rdaddress < 4) ? 17'h00000 : rdaddress - 4;
+    // 읽기 주소 동기화
+    wire [16:0] rdaddress_sync = rdaddress;
 
     // 듀얼 프레임 버퍼 RAM들 - 각각 32K x 12비트로 구성
     // RAM1: 이미지의 첫 번째 절반 저장 (픽셀 0-32767)
@@ -362,7 +361,7 @@ module digital_cam_top (
         .wraddress(wraddress_ram1), // 쓰기 주소
         .wrclock(ov7670_pclk),      // 쓰기 클럭 (카메라 픽셀 클럭)
         .wren(wren_ram1),           // 쓰기 활성화
-        .rdaddress(rdaddress_sync[15:0]), // 읽기 주소 (4클럭 지연)
+        .rdaddress(rdaddress_sync[15:0]), // 읽기 주소 (동기화)
         .rdclock(clk_25_vga),       // 읽기 클럭 (VGA 클럭)
         .q(rddata_ram1)             // 읽기 데이터
     );
@@ -373,7 +372,7 @@ module digital_cam_top (
         .wraddress(wraddress_ram2), // 쓰기 주소
         .wrclock(ov7670_pclk),      // 쓰기 클럭 (카메라 픽셀 클럭)
         .wren(wren_ram2),           // 쓰기 활성화
-        .rdaddress(rdaddress_sync[15:0]), // 읽기 주소 (4클럭 지연)
+        .rdaddress(rdaddress_sync[15:0]), // 읽기 주소 (동기화)
         .rdclock(clk_25_vga),       // 읽기 클럭 (VGA 클럭)
         .q(rddata_ram2)             // 읽기 데이터
     );
