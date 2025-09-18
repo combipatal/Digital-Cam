@@ -29,7 +29,7 @@ module sobel_3x3_gray8 (
     end
 
     reg        reset_done = 1'b0;
-    reg [2:0]  init_counter = 3'd0; // 6 clocks to prime 3x3
+    reg [1:0]  init_counter = 2'd0; // 6 clocks to prime 3x3
 
     // 3x3 caches
     reg [7:0] cache1 [0:2];
@@ -53,13 +53,13 @@ module sobel_3x3_gray8 (
         // 프레임 시작 또는 라인 시작 시 윈도우 초기화
         if ((vsync && !vsync_prev) || (active_area && !active_prev)) begin
             reset_done   <= 1'b0;
-            init_counter <= 3'd0;
+            init_counter <= 2'd0;
             cache1[0] <= 8'h00; cache1[1] <= 8'h00; cache1[2] <= 8'h00;
             cache2[0] <= 8'h00; cache2[1] <= 8'h00; cache2[2] <= 8'h00;
             cache3[0] <= 8'h00; cache3[1] <= 8'h00; cache3[2] <= 8'h00;
         end else if (enable && valid_addr && active_area) begin
             if (!reset_done) begin
-                if (init_counter < 3'd5) begin
+                if (init_counter < 2'd2) begin
                     init_counter <= init_counter + 1'b1;
                     cache1[0] <= 8'h00; cache1[1] <= 8'h00; cache1[2] <= 8'h00;
                     cache2[0] <= 8'h00; cache2[1] <= 8'h00; cache2[2] <= 8'h00;
@@ -94,8 +94,8 @@ module sobel_3x3_gray8 (
         end
     end
 
-    // Ensure left halo is available: suppress first 2 pixels each line
-    wire window_valid = enable && reset_done && valid_addr && active_area && (hpos >= 10'd2);
+    // Ensure left halo is available: suppress first 5 pixels each line
+    wire window_valid = enable && reset_done && valid_addr && active_area && (hpos >= 10'd5);
 
     // sobel compute (1 clock)
     // Gx = [-1 0 +1; -2 0 +2; -1 0 +1]
