@@ -19,7 +19,7 @@ module gaussian_3x3_gray8 (
     end
 
     reg        reset_done = 1'b0;
-    reg [2:0]  init_counter = 3'd0; // 0..5 -> 6 clocks to prime 3x3 window
+    reg [2:0]  init_counter = 2'd0; // 0..5 -> 6 clocks to prime 3x3 window
 
     // 3x3 window caches (line buffers collapsed as 3 shift registers of width 8)
     reg [7:0] cache1 [0:2];
@@ -42,22 +42,34 @@ module gaussian_3x3_gray8 (
     // stage-1 accumulators (max 16*255 = 4080 -> 12 bits)
     reg [11:0] sum_blur = 12'd0;
 
+     // per-line horizontal position within active_area (0..319)
+    reg [8:0] hpos = 9'd0;  // 9비트로 충분 (0~319)
+    always @(posedge clk) begin
+        if (active_area && !active_prev) begin
+            hpos <= 9'd0; // start of active line
+        end else if (enable && active_area) begin
+            if (hpos < 9'd319) hpos <= hpos + 1'b1;  // 320픽셀까지만 카운팅
+        end
+    end
+
+    wire window_valid = enable && reset_done && valid_addr && active_area && (hpos >= 9'd5);
+
     // line/window maintenance
     always @(posedge clk) begin
         // 프레임 시작 또는 라인 시작 시 윈도우 초기화
         if ((vsync && !vsync_prev) || (active_area && !active_prev)) begin
             reset_done   <= 1'b0;
-            init_counter <= 3'd0;
+            init_counter <= 2'd0;
             cache1[0] <= 8'h00; cache1[1] <= 8'h00; cache1[2] <= 8'h00;
             cache2[0] <= 8'h00; cache2[1] <= 8'h00; cache2[2] <= 8'h00;
             cache3[0] <= 8'h00; cache3[1] <= 8'h00; cache3[2] <= 8'h00;
         end else if (enable && valid_addr && active_area) begin
-            if (!reset_done) begin
-                if (init_counter < 3'd5) begin
-                    init_counter <= init_counter + 1'b1;
-                    cache1[0] <= 8'h00; cache1[1] <= 8'h00; cache1[2] <= 8'h00;
-                    cache2[0] <= 8'h00; cache2[1] <= 8'h00; cache2[2] <= 8'h00;
-                    cache3[0] <= 8'h00; cache3[1] <= 8'h00; cache3[2] <= 8'h00;
+                if (!reset_done) begin
+                    if (init_counter < 2'd2) begin
+                        init_counter <= init_counter + 1'b1;
+                        cache1[0] <= 8'h00; cache1[1] <= 8'h00; cache1[2] <= 8'h00;
+                        cache2[0] <= 8'h00; cache2[1] <= 8'h00; cache2[2] <= 8'h00;
+                        cache3[0] <= 8'h00; cache3[1] <= 8'h00; cache3[2] <= 8'h00;
                 end else begin
                     reset_done <= 1'b1;
                     cache1[0] <= cache1[1];
@@ -90,7 +102,7 @@ module gaussian_3x3_gray8 (
 
     // stage 1: weighted sum (kernel /16)
     always @(posedge clk) begin
-        if (enable && reset_done && valid_addr && active_area) begin
+        if (window_valid) begin
             sum_blur <= (g00 + g02 + g20 + g22)
                       + ((g01 + g10 + g12 + g21) << 1)
                       + (g11 << 2);
@@ -101,7 +113,7 @@ module gaussian_3x3_gray8 (
 
     // stage 2: normalize and output
     always @(posedge clk) begin
-        if (enable && reset_done && valid_addr && active_area) begin
+        if (window_valid) begin
             pixel_out   <= sum_blur[11:4]; // divide by 16
             filter_ready <= 1'b1;
         end else begin

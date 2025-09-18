@@ -6,6 +6,7 @@ module sobel_3x3_gray8 (
     input  wire [16:0] pixel_addr,
     input  wire        vsync,
     input  wire        active_area,
+    input  wire [7:0]  threshold,   // 임계값 입력
     output reg  [7:0]  pixel_out,
     output reg         sobel_ready
 );
@@ -18,18 +19,9 @@ module sobel_3x3_gray8 (
         active_prev <= active_area;
     end
 
-    // per-line horizontal position within active_area (0..319)
-    reg [8:0] hpos = 9'd0;  // 9비트로 충분 (0~319)
-    always @(posedge clk) begin
-        if (active_area && !active_prev) begin
-            hpos <= 9'd0; // start of active line
-        end else if (enable && active_area) begin
-            if (hpos < 9'd319) hpos <= hpos + 1'b1;  // 320픽셀까지만 카운팅
-        end
-    end
-
+   
     reg        reset_done = 1'b0;
-    reg [1:0]  init_counter = 2'd0; // 6 clocks to prime 3x3
+    reg [1:0]  init_counter = 2'd0; 
 
     // 3x3 caches
     reg [7:0] cache1 [0:2];
@@ -37,6 +29,7 @@ module sobel_3x3_gray8 (
     reg [7:0] cache3 [0:2];
 
     wire valid_addr = 1'b1;
+    wire window_valid = enable && reset_done && valid_addr && active_area;
 
     wire [7:0] p00 = cache1[0];
     wire [7:0] p01 = cache1[1];
@@ -94,8 +87,6 @@ module sobel_3x3_gray8 (
         end
     end
 
-    // Ensure left halo is available: suppress first 5 pixels each line
-    wire window_valid = enable && reset_done && valid_addr && active_area && (hpos >= 10'd5);
 
     // sobel compute (1 clock)
     // Gx = [-1 0 +1; -2 0 +2; -1 0 +1]
@@ -122,18 +113,16 @@ module sobel_3x3_gray8 (
         end
     end
 
-    // clamp & output (임계값 하향/완화)
+    // clamp & output (버튼 조절 임계값 기반 바이너리 엣지)
     always @(posedge clk) begin
         if (window_valid) begin
-            // 이전: 포화 조건이 낮아 암부가 쉽게 0에 가까워졌음
-            // 변경: 소프트 임계 + 약한 감마 보정
-            // 1) 소프트 컷: 4를 빼고 하한 0 고정
-            // 2) 약한 확장: 상위 비트 손실 줄이기 위해 (mag - 4) << 0 (동일) 유지
-            // 3) 상위 포화는 동일
+            // 포화 체크 후 8비트로 클램프
+            // 이후 임계값 비교로 바이너리 엣지 맵 생성
+            // mag > 255 이면 255로 취급
             if (mag[10:8] != 3'b000) begin
-                pixel_out <= 8'hFF;
+                pixel_out <= (8'hFF > threshold) ? 8'hFF : 8'h00;
             end else begin
-                pixel_out <= (mag[7:0] > 8'd2) ? (mag[7:0] - 8'd2) : 8'd0;
+                pixel_out <= (mag[7:0] > threshold) ? 8'hFF : 8'h00;
             end
             sobel_ready <= 1'b1;
         end else begin
