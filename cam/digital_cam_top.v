@@ -8,6 +8,7 @@ module digital_cam_top (
     input  wire        sw_grayscale,   // SW[0] 그레이스케일 모드 스위치
     input  wire        sw_sobel,       // SW[1] 소벨 필터 모드 스위치
     input  wire        sw_filter,      // SW[2] 디지털 필터 모드 스위치
+    input  wire        sw_canny,       // SW[3] 캐니 엣지 모드 스위치
     output wire        led_config_finished,  // 설정 완료 LED
     
     // VGA 출력 신호들
@@ -157,8 +158,10 @@ module digital_cam_top (
     wire [7:0] gray_value;           // 그레이스케일 값
     wire [7:0] red_value, green_value, blue_value;  // RGB 값들
     wire [7:0] sobel_value;          // 소벨 필터 값 (그레이스케일)
+    wire [7:0] canny_value;          // 캐니 엣지 값 (이진)
     wire [23:0] filtered_pixel;      // 디지털 필터 적용된 픽셀 (RGB888) - 그레이 복제
     wire filter_ready;               // 필터 처리 완료 신호
+    wire filter_ready2;              // 2차 가우시안 ready
     wire sobel_ready;                // 소벨 처리 완료 신호 (선언을 앞당겨 사용 이전에 배치)
     
     // RGB565 → RGB888 직접 변환 (화질 최적화)
@@ -202,8 +205,10 @@ module digital_cam_top (
     reg [7:0] filter_g_delayed [PIPE_LATENCY:0];        // filter g delayed value
     reg [7:0] filter_b_delayed [PIPE_LATENCY:0];        // filter b delayed value
     reg [7:0] sobel_value_delayed [PIPE_LATENCY:0];     // sobel value delayed value
+    reg [7:0] canny_value_delayed [PIPE_LATENCY:0];     // canny value delayed value
     reg       filter_ready_delayed [PIPE_LATENCY:0];     // filter ready delayed
     reg       sobel_ready_delayed  [PIPE_LATENCY:0];     // sobel ready delayed
+    reg       canny_ready_delayed  [PIPE_LATENCY:0];     // canny ready delayed
     integer i; 
     
 	// 파이프라인 정렬: 정상 상태 기준 PIPE_LATENCY 클럭 지연 체인
@@ -222,8 +227,10 @@ module digital_cam_top (
                 filter_g_delayed[i] <= 8'd0;
                 filter_b_delayed[i] <= 8'd0;
                 sobel_value_delayed[i] <= 8'd0;
+                canny_value_delayed[i] <= 8'd0;
                 filter_ready_delayed[i] <= 1'b0;
                 sobel_ready_delayed[i] <= 1'b0;
+                canny_ready_delayed[i] <= 1'b0;
             end
         end else begin
             // 0단계
@@ -238,8 +245,11 @@ module digital_cam_top (
             filter_g_delayed[0] <= filter_g_888;
             filter_b_delayed[0] <= filter_b_888;
             sobel_value_delayed[0] <= sobel_value; // 정렬 용도로만 유지, 값은 그대로
-            filter_ready_delayed[0] <= filter_ready;
+            canny_value_delayed[0] <= canny_value;
+            // 2차 가우시안 기준으로 ready 정렬
+            filter_ready_delayed[0] <= filter_ready2;
             sobel_ready_delayed[0]  <= sobel_ready;
+            canny_ready_delayed[0]  <= canny_ready;
             
             // 1-PIPE_LATENCY 단계 지연 체인
             for (i= 1; i <= PIPE_LATENCY; i = i + 1) begin
@@ -254,8 +264,10 @@ module digital_cam_top (
                 filter_g_delayed[i] <= filter_g_delayed[i-1];
                 filter_b_delayed[i] <= filter_b_delayed[i-1];
                 sobel_value_delayed[i] <= sobel_value_delayed[i-1];
+                canny_value_delayed[i] <= canny_value_delayed[i-1];
                 filter_ready_delayed[i] <= filter_ready_delayed[i-1];
                 sobel_ready_delayed[i]  <= sobel_ready_delayed[i-1];
+                canny_ready_delayed[i]  <= canny_ready_delayed[i-1];
             end
         end
     end
@@ -275,7 +287,6 @@ module digital_cam_top (
 
     // 가우시안 블러 2차 (강도 상승)
     wire [7:0] gray_blur2;
-    wire       filter_ready2;
     gaussian_3x3_gray8 gaussian_gray2_inst (
         .clk(clk_25_vga),
         .enable(filter_ready),
@@ -299,6 +310,23 @@ module digital_cam_top (
         .pixel_out(sobel_value),
         .sobel_ready(sobel_ready)
     );
+
+    // 캐니 엣지 검출 (히스테리시스만 적용, NMS 생략) - 2차 가우시안 결과 입력
+    wire canny_ready;
+    reg  [7:0] canny_thr_low  = 8'd24;  // 기본 낮은 임계
+    reg  [7:0] canny_thr_high = 8'd64;  // 기본 높은 임계
+    canny_3x3_gray8 canny_inst (
+        .clk(clk_25_vga),
+        .enable(filter_ready2),
+        .pixel_in(gray_blur2),
+        .pixel_addr(rdaddress),
+        .vsync(vSync),
+        .active_area(activeArea),
+        .threshold_low(canny_thr_low),
+        .threshold_high(canny_thr_high),
+        .pixel_out(canny_value),
+        .canny_ready(canny_ready)
+    );
     
     // 색상 값들 - RGB888 직접 사용
     assign red_value = activeArea ? r_888 : 8'h00;
@@ -321,10 +349,11 @@ module digital_cam_top (
     assign filter_b_888 = filtered_pixel[7:0];    // B 채널
     
     // 경로별 지연 인덱스
-    localparam integer IDX_ORIG  = PIPE_LATENCY;    //4
-    localparam integer IDX_GRAY  = PIPE_LATENCY;    //4
-    localparam integer IDX_GAUSS = PIPE_LATENCY - GAUSS_LAT;        // 2
-    localparam integer IDX_SOBEL = 0;                              // 0 
+    localparam integer IDX_ORIG  = PIPE_LATENCY;    // 최종 경로 정렬 인덱스 (6)
+    localparam integer IDX_GRAY  = PIPE_LATENCY;    // 최종 경로 정렬 인덱스 (6)
+    localparam integer IDX_GAUSS = PIPE_LATENCY - GAUSS_LAT;        // 가우시안 출력 정렬 인덱스 (2)
+    localparam integer IDX_SOBEL = 0;                              // 소벨 전용 경로(즉시 출력 경로용) 인덱스
+    localparam integer IDX_CANNY = PIPE_LATENCY;    // 캐니는 전체 파이프라인(6클럭) 후에 유효
 
     // 최종 출력 선택(경로별 인덱스 및 ready 게이팅)
     wire [7:0] sel_orig_r = activeArea_delayed[IDX_ORIG] ? red_value_delayed[IDX_ORIG] : 8'h00;
@@ -338,16 +367,17 @@ module digital_cam_top (
     wire [7:0] sel_gauss_b = (activeArea_delayed[IDX_GAUSS] && filter_ready_delayed[IDX_GAUSS]) ? filter_b_delayed[IDX_GAUSS] : 8'h00;
 
     wire [7:0] sel_sobel   = (activeArea_delayed[IDX_SOBEL] && sobel_ready_delayed[IDX_SOBEL]) ? sobel_value_delayed[IDX_SOBEL] : 8'h00;
+    wire [7:0] sel_canny   = (activeArea_delayed[IDX_CANNY] && canny_ready_delayed[IDX_CANNY]) ? canny_value_delayed[IDX_CANNY] : 8'h00;
 
-    assign final_r = sw_sobel ? sel_sobel :
+    assign final_r = sw_canny ? sel_canny : (sw_sobel ? sel_sobel :
                      (sw_grayscale ? sel_gray :
-                      (sw_filter ? sel_gauss_r : sel_orig_r));
-    assign final_g = sw_sobel ? sel_sobel :
+                     (sw_filter ? sel_gauss_r : sel_orig_r)));
+    assign final_g = sw_canny ? sel_canny : (sw_sobel ? sel_sobel :
                      (sw_grayscale ? sel_gray :
-                      (sw_filter ? sel_gauss_g : sel_orig_g));
-    assign final_b = sw_sobel ? sel_sobel :
+                     (sw_filter ? sel_gauss_g : sel_orig_g)));
+    assign final_b = sw_canny ? sel_canny : (sw_sobel ? sel_sobel :
                      (sw_grayscale ? sel_gray :
-                      (sw_filter ? sel_gauss_b : sel_orig_b));
+                     (sw_filter ? sel_gauss_b : sel_orig_b)));
     
     // VGA 출력 연결 (마스킹 제거)
     assign vga_r = final_r;
@@ -379,16 +409,16 @@ module digital_cam_top (
         .pixel_address(rdaddress)  // 픽셀 주소 출력
     );
 
-    // Hsync/Vsync를 데이터 경로 지연과 일치시키기 위한 파이프라인 (4클럭 지연)
-    reg [3:0] hsync_delay_pipe = 4'b0;
-    reg [3:0] vsync_delay_pipe = 4'b0;
+    // Hsync/Vsync를 데이터 경로 지연과 일치시키기 위한 파이프라인 (6클럭 지연)
+    reg [5:0] hsync_delay_pipe = 6'b0;
+    reg [5:0] vsync_delay_pipe = 6'b0;
     always @(posedge clk_25_vga) begin
-        hsync_delay_pipe <= {hsync_delay_pipe[2:0], hsync_raw};
-        vsync_delay_pipe <= {vsync_delay_pipe[2:0], vsync_raw};
+        hsync_delay_pipe <= {hsync_delay_pipe[4:0], hsync_raw};
+        vsync_delay_pipe <= {vsync_delay_pipe[4:0], vsync_raw};
     end
 
-    assign vga_hsync = hsync_delay_pipe[3];
-    assign vga_vsync = vsync_delay_pipe[3];
+    assign vga_hsync = hsync_delay_pipe[5];
+    assign vga_vsync = vsync_delay_pipe[5];
     
     // OV7670 카메라 컨트롤러
     ov7670_controller camera_ctrl (
