@@ -1,0 +1,11 @@
+read_verilog -sv -formal -overwrite {workspace}/gaussian_3x3_gray8.v
+read_verilog -sv -formal -overwrite {workspace}/sobel_3x3_gray8.v
+read_verilog -sv -formal -overwrite {workspace}/canny_3x3_gray8.v
+read_verilog -sv -formal -overwrite {workspace}/my_altpll.v
+read_verilog -sv -formal -overwrite {workspace}/VGA.v
+read_verilog -sv -formal -overwrite {workspace}/ov7670_controller.v
+read_verilog -sv -formal -overwrite {workspace}/ov7670_capture.v
+read_verilog -sv -formal -overwrite {workspace}/frame_buffer_ram.v
+read_verilog -sv -formal -overwrite {workspace}/digital_cam_top.v
+design -reset-vlog; proc;
+write_json {workspace}/netlist/digital_cam_top.json
