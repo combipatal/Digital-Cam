@@ -96,15 +96,18 @@ module digital_cam_top (
     wire [23:0] filtered_pixel;      // 디지털 필터 적용된 픽셀 (RGB888) - 그레이 복제
     wire filter_ready;               // 필터 처리 완료 신호
     wire filter_ready2;              // 2차 가우시안 ready
-    wire sobel_ready;                // 소벨 처리 완료 신호
-    wire canny_ready;                // 캐니 처리 완료 신호
-
-    // RGB565 → RGB888 직접 변환
-    wire [7:0] r_888, g_888, b_888;
-    assign r_888 = {rddata[15:11], rddata[15:13]};
-    assign g_888 = {rddata[10:5],  rddata[10:9]};
-    assign b_888 = {rddata[4:0],   rddata[4:2]};
-
+    wire sobel_ready;                // 소벨 처리 완료 신호 (선언을 앞당겨 사용 이전에 배치)
+    
+    // RGB565 → RGB888 직접 변환 (화질 최적화)
+    // RGB565: R[15:11] G[10:5] B[4:0]
+    // RGB888: R[7:0] G[7:0] B[7:0]
+    wire [7:0] r_888, g_888, b_888;  // RGB888로 확장된 값들
+    
+    assign r_888 = {rddata[15:11], 3'b111};  // 5비트 → 8비트 비트복제
+    assign g_888 = {rddata[10:5], 2'b11};   // 6비트 → 8비트 비트복제
+    assign b_888 = {rddata[4:0],  3'b11};    // 5비트 → 8비트 비트복제
+    
+    // RGB888을 하나의 24비트 픽셀로 결합 (필터 입력용)
     wire [23:0] rgb888_pixel = {r_888, g_888, b_888};
 
     // VGA 동기화 신호 원본 (사용 지점 이전에 선언)
@@ -121,33 +124,32 @@ module digital_cam_top (
     // 필터 적용된 픽셀에서 RGB 분리
     wire [7:0] filter_r_888, filter_g_888, filter_b_888;
 
-    // 파이프라인 지연
-    localparam integer GAUSS_LAT = 2;
+    // 파이프라인 지연: 경로별 상이
+    // - 가우시안 2회: 4클럭, 소벨 추가: 2클럭 → 총 6클럭
+    localparam integer GAUSS_LAT = 4;
     localparam integer SOBEL_EXTRA_LAT = 2;
-    // 전체 파이프라인 지연(최대 경로: 가우시안 + 4클럭 추가 경로 = 6)
-    localparam integer PIPE_LATENCY = GAUSS_LAT + 4; // 6
-
-    reg [16:0] rdaddress_delayed [PIPE_LATENCY:0];
-    reg activeArea_delayed [PIPE_LATENCY:0];
-    reg [7:0] red_value_delayed [PIPE_LATENCY:0];
-    reg [7:0] green_value_delayed [PIPE_LATENCY:0];
-    reg [7:0] blue_value_delayed [PIPE_LATENCY:0];
-    reg [7:0] gray_value_delayed [PIPE_LATENCY:0];
-    reg [23:0] filtered_pixel_delayed [PIPE_LATENCY:0];
-    reg [7:0] filter_r_delayed [PIPE_LATENCY:0];
-    reg [7:0] filter_g_delayed [PIPE_LATENCY:0];
-    reg [7:0] filter_b_delayed [PIPE_LATENCY:0];
-    reg [7:0] sobel_value_delayed [PIPE_LATENCY:0];
-    reg [7:0] canny_value_delayed [PIPE_LATENCY:0];
-    reg       filter_ready_delayed [PIPE_LATENCY:0];
-    reg       sobel_ready_delayed  [PIPE_LATENCY:0];
-    reg       canny_ready_delayed  [PIPE_LATENCY:0];
+    localparam integer PIPE_LATENCY = GAUSS_LAT + SOBEL_EXTRA_LAT; // 6
+    reg [16:0] rdaddress_delayed [PIPE_LATENCY:0];      // rdaddress delayed value
+    reg activeArea_delayed [PIPE_LATENCY:0];            // active area delayed value
+    reg [7:0] red_value_delayed [PIPE_LATENCY:0];       // red delayed value
+    reg [7:0] green_value_delayed [PIPE_LATENCY:0];     // green delayed value
+    reg [7:0] blue_value_delayed [PIPE_LATENCY:0];      // blue delayed value
+    reg [7:0] gray_value_delayed [PIPE_LATENCY:0];      // gray delayed value
+    reg [23:0] filtered_pixel_delayed [PIPE_LATENCY:0]; // filtered pixel delayed value
+    reg [7:0] filter_r_delayed [PIPE_LATENCY:0];        // filter r delayed value
+    reg [7:0] filter_g_delayed [PIPE_LATENCY:0];        // filter g delayed value
+    reg [7:0] filter_b_delayed [PIPE_LATENCY:0];        // filter b delayed value
+    reg [7:0] sobel_value_delayed [PIPE_LATENCY:0];     // sobel value delayed value
+    reg [7:0] canny_value_delayed [PIPE_LATENCY:0];     // canny value delayed value
+    reg       filter_ready_delayed [PIPE_LATENCY:0];     // filter ready delayed
+    reg       sobel_ready_delayed  [PIPE_LATENCY:0];     // sobel ready delayed
+    reg       canny_ready_delayed  [PIPE_LATENCY:0];     // canny ready delayed
     integer i; 
 
     // 파이프라인 정렬
     always @(posedge clk_25_vga) begin
         // 프레임 시작(Vsync 로우) 시 모든 지연 레지스터 클리어
-        if (vsync_raw == 1'b0) begin
+        if (vSync == 1'b0) begin
             for (i = 0; i <= PIPE_LATENCY; i = i + 1) begin
                 rdaddress_delayed[i] <= 17'd0;
                 activeArea_delayed[i] <= 1'b0;
@@ -229,13 +231,14 @@ module digital_cam_top (
         .sobel_ready(sobel_ready)
     );
 
-    // 캐니 엣지 검출 (간단 버전)
+    // 캐니 엣지 검출 (히스테리시스만 적용, NMS 생략) - 2차 가우시안 결과 입력
+    wire canny_ready;
     reg  [7:0] canny_thr_low  = 8'd24;  // 기본 낮은 임계
     reg  [7:0] canny_thr_high = 8'd64;  // 기본 높은 임계
     canny_3x3_gray8 canny_inst (
         .clk(clk_25_vga),
-        .enable(1'b1),
-        .pixel_in(gray_blur),
+        .enable(filter_ready2),
+        .pixel_in(gray_blur2),
         .pixel_addr(rdaddress),
         .vsync(vsync_raw),
         .active_area(activeArea),
@@ -266,11 +269,11 @@ module digital_cam_top (
     assign filter_b_888 = filtered_pixel[7:0];
 
     // 경로별 지연 인덱스
-    localparam integer IDX_ORIG  = PIPE_LATENCY;
-    localparam integer IDX_GRAY  = PIPE_LATENCY;
-    localparam integer IDX_GAUSS = GAUSS_LAT;
-    localparam integer IDX_SOBEL = GAUSS_LAT + SOBEL_EXTRA_LAT;
-    localparam integer IDX_CANNY = GAUSS_LAT + 4;
+    localparam integer IDX_ORIG  = PIPE_LATENCY;    // 최종 경로 정렬 인덱스 (6)
+    localparam integer IDX_GRAY  = PIPE_LATENCY;    // 최종 경로 정렬 인덱스 (6)
+    localparam integer IDX_GAUSS = PIPE_LATENCY - GAUSS_LAT;        // 가우시안 출력 정렬 인덱스 (2)
+    localparam integer IDX_SOBEL = 0;                              // 소벨 전용 경로(즉시 출력 경로용) 인덱스
+    localparam integer IDX_CANNY = PIPE_LATENCY;    // 캐니는 전체 파이프라인(6클럭) 후에 유효
 
     // 최종 출력 선택(경로별 인덱스 및 ready 게이팅)
     wire [7:0] sel_orig_r = activeArea_delayed[IDX_ORIG] ? red_value_delayed[IDX_ORIG] : 8'h00;
@@ -348,10 +351,10 @@ module digital_cam_top (
 
     // OV7670 캡처 모듈
     ov7670_capture #(
-        .H_SKIP_LEFT(0),
-        .H_SKIP_RIGHT(0),
-        .V_SKIP_TOP(0),
-        .V_SKIP_BOTTOM(0)
+        .H_SKIP_LEFT(8),
+        .H_SKIP_RIGHT(8),
+        .V_SKIP_TOP(4),
+        .V_SKIP_BOTTOM(4)
     ) capture_inst (
         .pclk(ov7670_pclk),
         .vsync(ov7670_vsync),

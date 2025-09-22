@@ -13,7 +13,7 @@ module ov7670_capture (
     // 크롭 파라미터 (필요 시 조정)
     // 좌/우/상/하 테두리 픽셀을 버리고 블랙으로 채움
     parameter integer H_SKIP_LEFT   = 0;  // 0..319
-    parameter integer H_SKIP_RIGHT  = 10;  // 0..319
+    parameter integer H_SKIP_RIGHT  = 0;  // 0..319
     parameter integer V_SKIP_TOP    = 0;  // 0..239
     parameter integer V_SKIP_BOTTOM = 0;  // 0..239
 
