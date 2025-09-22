@@ -63,11 +63,31 @@ module digital_cam_top (
     wire ready_blur2;         // 2차 가우시안 필터 유효
     wire ready_sobel;         // 소벨 필터 유효
 
+    // 소벨 임계값
+    reg [7:0] sobel_threshold; // 소벨 필터 임계값 레지스터
+    wire      thr_up_pulse;   // 임계값 증가 펄스
+    wire      thr_down_pulse; // 임계값 감소 펄스
+
+
     // --- 버튼 디바운싱 ---
     wire resend; // 카메라 설정 재전송 펄스
-    // (이하 디바운싱 로직은 생략, 기존 코드와 동일)
+    debounce #( .WIDTH(1), .POLARITY(0) ) BTN_RESEND_DEBOUNCER ( .clk(clk_50), .button_in(~btn_resend), .button_pulse(resend) );
+    debounce #( .WIDTH(1), .POLARITY(0) ) BTN_THR_UP_DEBOUNCER   ( .clk(clk_50), .button_in(~btn_thr_up),   .button_pulse(thr_up_pulse) );
+    debounce #( .WIDTH(1), .POLARITY(0) ) BTN_THR_DOWN_DEBOUNCER ( .clk(clk_50), .button_in(~btn_thr_down), .button_pulse(thr_down_pulse) );
 
-
+    // --- 소벨 임계값 제어 로직 ---
+    always @(posedge clk_50) begin
+        if (resend) begin // 리셋 (카메라 재설정 시)
+            sobel_threshold <= 8'd50; // 기본값으로 초기화
+        end else if (thr_up_pulse) begin
+            if (sobel_threshold < 8'd255) // 최대값 255
+                sobel_threshold <= sobel_threshold + 8;
+        end else if (thr_down_pulse) begin
+            if (sobel_threshold > 8'd0) // 최소값 0
+                sobel_threshold <= sobel_threshold - 8;
+        end
+    end
+    
     // --- 듀얼 프레임 버퍼 로직 ---
     // 320x240 = 76800 픽셀을 두 개의 RAM으로 분할 (각 32K x 16bit)
     // RAM1: 주소 0 ~ 32767

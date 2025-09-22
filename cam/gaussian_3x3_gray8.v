@@ -53,7 +53,7 @@ module gaussian_3x3_gray8 (
                 h_count <= 9'd0;
                 v_count <= 9'd0;
             end else begin
-                if (h_count == H_ACTIVE - 1) begin
+                if (is_last_col) begin
                     h_count <= 9'd0;
                     if (v_count == V_ACTIVE - 1) begin
                         v_count <= 9'd0; // 프레임 마지막에서 리셋 (vsync로도 처리 가능)
