@@ -107,13 +107,9 @@ set_location_assignment PIN_AF16 -to ov7670_xclk
 set_location_assignment PIN_AF15 -to ov7670_reset
 set_location_assignment PIN_AD19 -to ov7670_pwdn
 set_location_assignment PIN_AB28 -to sw_grayscale
-set_location_assignment PIN_AC28 -to sw_sobel
 set_global_assignment -name POWER_PRESET_COOLING_SOLUTION "23 MM HEAT SINK WITH 200 LFPM AIRFLOW"
 set_global_assignment -name POWER_BOARD_THERMAL_MODEL "NONE (CONSERVATIVE)"
 set_location_assignment PIN_AC28 -to sw_filter
-set_location_assignment PIN_N21 -to btn_thr_down
-set_location_assignment PIN_R24 -to btn_thr_up
-set_location_assignment PIN_AD27 -to sw_thr_select
 set_global_assignment -name VERILOG_FILE sobel_3x3_gray8.v
 set_global_assignment -name VERILOG_FILE gaussian_3x3_gray8.v
 set_global_assignment -name VERILOG_FILE VGA.v
@@ -122,4 +118,6 @@ set_global_assignment -name VERILOG_FILE ov7670_capture.v
 set_global_assignment -name VERILOG_FILE digital_cam_top.v
 set_global_assignment -name QIP_FILE my_altpll.qip
 set_global_assignment -name QIP_FILE frame_buffer_ram.qip
+set_location_assignment PIN_AD27 -to sw_canny
+set_location_assignment PIN_AC27 -to sw_sobel
 set_instance_assignment -name PARTITION_HIERARCHY root_partition -to | -section_id Top

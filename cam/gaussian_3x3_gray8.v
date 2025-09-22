@@ -80,8 +80,6 @@ module gaussian_3x3_gray8 (
         end
     end
 
-    assign effective_pixel_in = (hpos < 2) ? line_start_pixel : pixel_in;
-
     // stage 1: weighted sum (kernel /16)
     always @(posedge clk) begin
         if (enable && reset_done && valid_addr && active_area) begin
