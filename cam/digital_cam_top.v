@@ -95,7 +95,11 @@ module digital_cam_top (
 
     // 그레이스케일 변환 (Y = 0.299R + 0.587G + 0.114B)
     // 정수 근사 연산: Y = (77*R + 150*G + 29*B) >> 8
-    wire [16:0] gray_sum = 77 * r_888 + 150 * g_888 + 29 * b_888;
+    wire [16:0] gray_sum;
+    // 곱셈을 시프트와 덧셈 연산으로 대체하여 하드웨어 효율성 향상
+    assign gray_sum = (r_888 << 6) + (r_888 << 3) + (r_888 << 2) + r_888      // 77*R = (64+8+4+1)*R
+                   + (g_888 << 7) + (g_888 << 4) + (g_888 << 2) + (g_888 << 1) // 150*G = (128+16+4+2)*G
+                   + (b_888 << 4) + (b_888 << 3) + (b_888 << 2) + b_888;     // 29*B = (16+8+4+1)*B
     assign gray_value = vga_active_area ? gray_sum[15:8] : 8'h00;
 
 
@@ -119,12 +123,13 @@ module digital_cam_top (
     reg ready_blur2_pipe [MAX_LATENCY-1:0];
     reg ready_sobel_pipe [MAX_LATENCY-1:0];
 
+    integer i;
+
     // 파이프라인 레지스터 동작
     always @(posedge clk_25_vga) begin
         // 0단계: 현재 신호 입력
-        active_area_pipe <= {active_area_pipe[MAX_LATENCY-2:0], vga_active_area};
-        
-        integer i;
+        active_area_pipe <= {active_area_pipe[MAX_LATENCY-2:0], vga_active_area};        
+
         for (i = 0; i < MAX_LATENCY; i = i + 1) begin
             r_pipe[i] <= (i == 0) ? r_888 : r_pipe[i-1];
             g_pipe[i] <= (i == 0) ? g_888 : g_pipe[i-1];
@@ -141,24 +146,39 @@ module digital_cam_top (
     // --- 이미지 처리 필터 인스턴스 ---
     // 1차 가우시안 블러 (노이즈 제거)
     gaussian_3x3_gray8 gauss1 (
-        .clk(clk_25_vga), .enable(1'b1), .pixel_in(gray_value),
-        .pixel_addr(rdaddress), .vsync(vga_vsync_raw), .active_area(vga_active_area),
-        .pixel_out(gray_blur1), .filter_ready(ready_blur1)
+        .clk(clk_25_vga), 
+        .enable(1'b1), 
+        .pixel_in(gray_value),
+        .pixel_addr(rdaddress), 
+        .vsync(vga_vsync_raw), 
+        .active_area(vga_active_area),
+        .pixel_out(gray_blur1), 
+        .filter_ready(ready_blur1)
     );
 
     // 2차 가우시안 블러 (더 강한 블러 효과)
     gaussian_3x3_gray8 gauss2 (
-        .clk(clk_25_vga), .enable(ready_blur1), .pixel_in(gray_blur1),
-        .pixel_addr(rdaddress), .vsync(vga_vsync_raw), .active_area(vga_active_area),
-        .pixel_out(gray_blur2), .filter_ready(ready_blur2)
+        .clk(clk_25_vga), 
+        .enable(ready_blur1), 
+        .pixel_in(gray_blur1),
+        .pixel_addr(rdaddress), 
+        .vsync(vga_vsync_raw), 
+        .active_area(vga_active_area),
+        .pixel_out(gray_blur2), 
+        .filter_ready(ready_blur2)
     );
 
     // 소벨 엣지 검출
     sobel_3x3_gray8 sobel (
-        .clk(clk_25_vga), .enable(ready_blur2), .pixel_in(gray_blur2),
-        .pixel_addr(rdaddress), .vsync(vga_vsync_raw), .active_area(vga_active_area),
+        .clk(clk_25_vga), 
+        .enable(ready_blur2), 
+        .pixel_in(gray_blur2),
+        .pixel_addr(rdaddress), 
+        .vsync(vga_vsync_raw), 
+        .active_area(vga_active_area),
         .threshold(sobel_threshold),
-        .pixel_out(sobel_out), .sobel_ready(ready_sobel)
+        .pixel_out(sobel_out), 
+        .sobel_ready(ready_sobel)
     );
 
 
@@ -205,15 +225,22 @@ module digital_cam_top (
     // --- 모듈 인스턴스화 ---
     // PLL: 50MHz -> 24MHz (카메라), 25.175MHz (VGA)
     my_altpll pll_inst (
-        .inclk0(clk_50), .c0(clk_24_camera), .c1(clk_25_vga)
+        .inclk0(clk_50), 
+        .c0(clk_24_camera), 
+        .c1(clk_25_vga)
     );
     
     // VGA 컨트롤러
     VGA vga_inst (
-        .CLK25(clk_25_vga), .pixel_data(rddata), .clkout(vga_CLK),
-        .Hsync(vga_hsync_raw), .Vsync(vga_vsync_raw),
-        .Nblank(vga_blank_N_raw), .Nsync(vga_sync_N),
-        .activeArea(vga_active_area), .pixel_address(rdaddress)
+        .CLK25(clk_25_vga), 
+        .pixel_data(rddata), 
+        .clkout(vga_CLK),
+        .Hsync(vga_hsync_raw), 
+        .Vsync(vga_vsync_raw),
+        .Nblank(vga_blank_N_raw), 
+        .Nsync(vga_sync_N),
+        .activeArea(vga_active_area), 
+        .pixel_address(rdaddress)
     );
 
     // Hsync/Vsync 파이프라인 지연 (MAX_LATENCY)
@@ -227,26 +254,46 @@ module digital_cam_top (
     
     // OV7670 카메라 컨트롤러 (I2C 설정)
     ov7670_controller camera_ctrl (
-        .clk_50(clk_50), .clk_24(clk_24_camera), .resend(resend),
+        .clk_50(clk_50), 
+        .clk_24(clk_24_camera), 
+        .resend(resend),
         .config_finished(led_config_finished),
-        .sioc(ov7670_sioc), .siod(ov7670_siod),
-        .reset(ov7670_reset), .pwdn(ov7670_pwdn), .xclk(ov7670_xclk)
+        .sioc(ov7670_sioc), 
+        .siod(ov7670_siod),
+        .reset(ov7670_reset), 
+        .pwdn(ov7670_pwdn), 
+        .xclk(ov7670_xclk)
     );
     
     // OV7670 캡처 모듈
     ov7670_capture capture_inst (
-        .pclk(ov7670_pclk), .vsync(ov7670_vsync), .href(ov7670_href), .d(ov7670_data),
-        .addr(wraddress), .dout(wrdata), .we(wren)
+        .pclk(ov7670_pclk), 
+        .vsync(ov7670_vsync), 
+        .href(ov7670_href), 
+        .d(ov7670_data),
+        .addr(wraddress), 
+        .dout(wrdata), 
+        .we(wren)
     );
     
     // 듀얼 프레임 버퍼 RAM
     frame_buffer_ram ram1 (
-        .data(wrdata), .wraddress(wraddress_ram1), .wrclock(ov7670_pclk), .wren(wren_ram1),
-        .rdaddress(rdaddress_ram1), .rdclock(clk_25_vga), .q(rddata_ram1)
+        .data(wrdata), 
+        .wraddress(wraddress_ram1), 
+        .wrclock(ov7670_pclk), 
+        .wren(wren_ram1),
+        .rdaddress(rdaddress_ram1), 
+        .rdclock(clk_25_vga), 
+        .q(rddata_ram1)
     );
     frame_buffer_ram ram2 (
-        .data(wrdata), .wraddress(wraddress_ram2), .wrclock(ov7670_pclk), .wren(wren_ram2),
-        .rdaddress(rdaddress_ram2), .rdclock(clk_25_vga), .q(rddata_ram2)
+        .data(wrdata), 
+        .wraddress(wraddress_ram2), 
+        .wrclock(ov7670_pclk), 
+        .wren(wren_ram2),
+        .rdaddress(rdaddress_ram2), 
+        .rdclock(clk_25_vga), 
+        .q(rddata_ram2)
     );
 
 endmodule

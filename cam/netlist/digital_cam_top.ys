@@ -1,6 +1,4 @@
 read_verilog -sv -formal -overwrite {workspace}/gaussian_3x3_gray8.v
-read_verilog -sv -formal -overwrite {workspace}/sobel_3x3_gray8.v
-read_verilog -sv -formal -overwrite {workspace}/canny_3x3_gray8.v
 read_verilog -sv -formal -overwrite {workspace}/my_altpll.v
 read_verilog -sv -formal -overwrite {workspace}/VGA.v
 read_verilog -sv -formal -overwrite {workspace}/ov7670_controller.v
