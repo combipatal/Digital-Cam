@@ -48,8 +48,15 @@ module digital_cam_top (
     wire [15:0] rddata;     // RAM 읽기 데이터 (RGB565)
 
     // VGA 컨트롤러 신호
-    wire vga_active_area; // VGA 유효 영상 영역
+    wire vga_active_area; // VGA 유효 영상 영역 (원본)
     wire vga_vsync_raw;   // 지연되지 않은 원본 Vsync
+    wire vga_blank_N_raw; // 지연되지 않은 원본 Nblank
+
+    // 메모리 읽기 1클럭 지연 보정용 VGA 제어 신호 딜레이(1사이클)
+    reg vga_active_area_d1;
+    reg vga_vsync_raw_d1;
+    reg vga_hsync_raw_d1;
+    reg vga_blank_N_raw_d1;
 
     // 이미지 처리 파이프라인 신호
     wire [7:0] gray_value;      // 그레이스케일 변환 결과
@@ -71,9 +78,9 @@ module digital_cam_top (
 
     // --- 버튼 디바운싱 ---
     wire resend; // 카메라 설정 재전송 펄스
-    debounce #( .WIDTH(1), .POLARITY(0) ) BTN_RESEND_DEBOUNCER ( .clk(clk_50), .button_in(~btn_resend), .button_pulse(resend) );
-    debounce #( .WIDTH(1), .POLARITY(0) ) BTN_THR_UP_DEBOUNCER   ( .clk(clk_50), .button_in(~btn_thr_up),   .button_pulse(thr_up_pulse) );
-    debounce #( .WIDTH(1), .POLARITY(0) ) BTN_THR_DOWN_DEBOUNCER ( .clk(clk_50), .button_in(~btn_thr_down), .button_pulse(thr_down_pulse) );
+    debounce #( .WIDTH(1), .POLARITY(1), .COUNTER_MAX(1_000_000) ) BTN_RESEND_DEBOUNCER ( .clk(clk_50), .button_in(~btn_resend), .button_pulse(resend) );
+    debounce #( .WIDTH(1), .POLARITY(1), .COUNTER_MAX(1_000_000) ) BTN_THR_UP_DEBOUNCER   ( .clk(clk_50), .button_in(~btn_thr_up),   .button_pulse(thr_up_pulse) );
+    debounce #( .WIDTH(1), .POLARITY(1), .COUNTER_MAX(1_000_000) ) BTN_THR_DOWN_DEBOUNCER ( .clk(clk_50), .button_in(~btn_thr_down), .button_pulse(thr_down_pulse) );
 
     // --- 소벨 임계값 제어 로직 ---
     always @(posedge clk_50) begin
@@ -113,6 +120,14 @@ module digital_cam_top (
     assign g_888 = {rddata[10:5],  rddata[10:9]};  // 6bit -> 8bit
     assign b_888 = {rddata[4:0],   rddata[4:2]};   // 5bit -> 8bit
 
+    // 메모리 1사이클 지연 보정: VGA 제어 신호 1클럭 딜레이
+    always @(posedge clk_25_vga) begin
+        vga_active_area_d1 <= vga_active_area;
+        vga_vsync_raw_d1   <= vga_vsync_raw;
+        vga_hsync_raw_d1   <= vga_hsync_raw;
+        vga_blank_N_raw_d1 <= vga_blank_N_raw;
+    end
+
     // 그레이스케일 변환 (Y = 0.299R + 0.587G + 0.114B)
     // 정수 근사 연산: Y = (77*R + 150*G + 29*B) >> 8
     wire [16:0] gray_sum;
@@ -120,7 +135,7 @@ module digital_cam_top (
     assign gray_sum = (r_888 << 6) + (r_888 << 3) + (r_888 << 2) + r_888      // 77*R = (64+8+4+1)*R
                    + (g_888 << 7) + (g_888 << 4) + (g_888 << 2) + (g_888 << 1) // 150*G = (128+16+4+2)*G
                    + (b_888 << 4) + (b_888 << 3) + (b_888 << 2) + b_888;     // 29*B = (16+8+4+1)*B
-    assign gray_value = vga_active_area ? gray_sum[15:8] : 8'h00;
+    assign gray_value = vga_active_area_d1 ? gray_sum[15:8] : 8'h00;
 
 
     // --- 파이프라인 지연 보상 ---
@@ -145,10 +160,10 @@ module digital_cam_top (
 
     integer i;
 
-    // 파이프라인 레지스터 동작
+    // 파이프라인 레지스터 동작 (메모리 지연 반영: d1 신호 기준)
     always @(posedge clk_25_vga) begin
         // 0단계: 현재 신호 입력
-        active_area_pipe <= {active_area_pipe[MAX_LATENCY-2:0], vga_active_area};        
+        active_area_pipe <= {active_area_pipe[MAX_LATENCY-2:0], vga_active_area_d1};        
 
         for (i = 0; i < MAX_LATENCY; i = i + 1) begin
             r_pipe[i] <= (i == 0) ? r_888 : r_pipe[i-1];
@@ -170,8 +185,8 @@ module digital_cam_top (
         .enable(1'b1), 
         .pixel_in(gray_value),
         .pixel_addr(rdaddress), 
-        .vsync(vga_vsync_raw), 
-        .active_area(vga_active_area),
+        .vsync(vga_vsync_raw_d1), 
+        .active_area(vga_active_area_d1),
         .pixel_out(gray_blur1), 
         .filter_ready(ready_blur1)
     );
@@ -182,8 +197,8 @@ module digital_cam_top (
         .enable(ready_blur1), 
         .pixel_in(gray_blur1),
         .pixel_addr(rdaddress), 
-        .vsync(vga_vsync_raw), 
-        .active_area(vga_active_area),
+        .vsync(vga_vsync_raw_d1), 
+        .active_area(vga_active_area_d1),
         .pixel_out(gray_blur2), 
         .filter_ready(ready_blur2)
     );
@@ -194,8 +209,8 @@ module digital_cam_top (
         .enable(ready_blur2), 
         .pixel_in(gray_blur2),
         .pixel_addr(rdaddress), 
-        .vsync(vga_vsync_raw), 
-        .active_area(vga_active_area),
+        .vsync(vga_vsync_raw_d1), 
+        .active_area(vga_active_area_d1),
         .threshold(sobel_threshold),
         .pixel_out(sobel_out), 
         .sobel_ready(ready_sobel)
@@ -239,7 +254,6 @@ module digital_cam_top (
     assign vga_r = final_r;
     assign vga_g = final_g;
     assign vga_b = final_b;
-    assign vga_blank_N = vga_active_area;
 
 
     // --- 모듈 인스턴스화 ---
@@ -263,14 +277,16 @@ module digital_cam_top (
         .pixel_address(rdaddress)
     );
 
-    // Hsync/Vsync 파이프라인 지연 (MAX_LATENCY)
-    reg [MAX_LATENCY-1:0] hsync_pipe, vsync_pipe;
+    // Hsync/Vsync/Nblank 파이프라인 지연 (RAM 딜레이 1사이클 포함을 위해 d1 신호 사용)
+    reg [MAX_LATENCY-1:0] hsync_pipe, vsync_pipe, nblank_pipe;
     always @(posedge clk_25_vga) begin
-        hsync_pipe <= {hsync_pipe[MAX_LATENCY-2:0], vga_hsync_raw};
-        vsync_pipe <= {vsync_pipe[MAX_LATENCY-2:0], vga_vsync_raw};
+        hsync_pipe <= {hsync_pipe[MAX_LATENCY-2:0], vga_hsync_raw_d1};
+        vsync_pipe <= {vsync_pipe[MAX_LATENCY-2:0], vga_vsync_raw_d1};
+        nblank_pipe <= {nblank_pipe[MAX_LATENCY-2:0], vga_blank_N_raw_d1};
     end
     assign vga_hsync = hsync_pipe[MAX_LATENCY-1];
     assign vga_vsync = vsync_pipe[MAX_LATENCY-1];
+    assign vga_blank_N = nblank_pipe[MAX_LATENCY-1];
     
     // OV7670 카메라 컨트롤러 (I2C 설정)
     ov7670_controller camera_ctrl (
