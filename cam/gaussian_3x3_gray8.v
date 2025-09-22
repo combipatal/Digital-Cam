@@ -16,32 +16,6 @@ module gaussian_3x3_gray8 (
     always @(posedge clk) begin
         vsync_prev <= vsync;
         active_prev <= active_area;
-<<<<<<< HEAD
-
-        if (enable && active_area) begin
-            // 프레임 시작 (active_area 상승 엣지)
-            if (!active_prev) begin
-                h_count <= 9'd0;
-                v_count <= 9'd0;
-            end else begin
-                if (is_last_col) begin
-                    h_count <= 9'd0;
-                    if (v_count == V_ACTIVE - 1) begin
-                        v_count <= 9'd0; // 프레임 마지막에서 리셋 (vsync로도 처리 가능)
-                    end else begin
-                        v_count <= v_count + 1;
-                    end
-                end else begin
-                    h_count <= h_count + 1;
-                end
-            end
-        end else begin
-            // 비활성 구간에서는 카운터 리셋
-            h_count <= 9'd0;
-            v_count <= 9'd0;
-        end
-=======
->>>>>>> parent of 81b9c07 (디지털 카메라 모듈 및 필터 개선: OV7670 카메라 인터페이스와 VGA 출력 신호를 통합하여 시스템 구조를 최적화했습니다. 또한, 가우시안 블러 및 소벨 필터의 입력 및 출력 신호를 개선하고, 버튼 디바운싱 로직을 정리하여 코드의 가독성을 높였습니다. VGA 컨트롤러의 타이밍 및 주소 생성 로직을 수정하여 성능을 향상시켰습니다.)
     end
 
     reg        reset_done = 1'b0;

@@ -44,25 +44,7 @@ module digital_cam_top (
     wire [15:0] wrdata;     // RAM 쓰기 데이터 (RGB565)
     wire [16:0] rdaddress;  // RAM 읽기 주소
     wire [15:0] rddata;     // RAM 읽기 데이터 (RGB565)
-<<<<<<< HEAD
-
-    // VGA 컨트롤러 신호
-    wire vga_active_area; // VGA 유효 영상 영역 (원본)
-    wire vga_vsync_raw;   // 지연되지 않은 원본 Vsync
-    wire vga_blank_N_raw; // 지연되지 않은 원본 Nblank
-
-    // 메모리 읽기 1클럭 지연 보정용 VGA 제어 신호 딜레이(1사이클)
-    reg vga_active_area_d1;
-    reg vga_vsync_raw_d1;
-    reg vga_hsync_raw_d1;
-    reg vga_blank_N_raw_d1;
-
-    // 이미지 처리 파이프라인 신호
-    wire [7:0] gray_value;      // 그레이스케일 변환 결과
-    wire [7:0] r_888, g_888, b_888; // RGB565 to RGB888 변환 결과
-=======
     wire activeArea;        // VGA 활성 영역
->>>>>>> parent of 81b9c07 (디지털 카메라 모듈 및 필터 개선: OV7670 카메라 인터페이스와 VGA 출력 신호를 통합하여 시스템 구조를 최적화했습니다. 또한, 가우시안 블러 및 소벨 필터의 입력 및 출력 신호를 개선하고, 버튼 디바운싱 로직을 정리하여 코드의 가독성을 높였습니다. VGA 컨트롤러의 타이밍 및 주소 생성 로직을 수정하여 성능을 향상시켰습니다.)
     
     // 듀얼 프레임 버퍼 신호들 (320x240 = 76800 픽셀을 두 개의 RAM으로 분할)
     wire [15:0] wraddress_ram1, rdaddress_ram1; // RAM1: 16비트 주소 (0-32767)
@@ -95,41 +77,6 @@ module digital_cam_top (
     
     assign btn_rising_edge = btn_pressed & ~btn_pressed_prev;  // 상승 에지 감지
 
-<<<<<<< HEAD
-    // 소벨 임계값
-    reg [7:0] sobel_threshold; // 소벨 필터 임계값 레지스터
-    wire      thr_up_pulse;   // 임계값 증가 펄스
-    wire      thr_down_pulse; // 임계값 감소 펄스
-
-
-    // --- 버튼 디바운싱 ---
-    wire resend; // 카메라 설정 재전송 펄스
-    debounce #( .WIDTH(1), .POLARITY(1), .COUNTER_MAX(1_000_000) ) BTN_RESEND_DEBOUNCER ( .clk(clk_50), .button_in(~btn_resend), .button_pulse(resend) );
-    debounce #( .WIDTH(1), .POLARITY(1), .COUNTER_MAX(1_000_000) ) BTN_THR_UP_DEBOUNCER   ( .clk(clk_50), .button_in(~btn_thr_up),   .button_pulse(thr_up_pulse) );
-    debounce #( .WIDTH(1), .POLARITY(1), .COUNTER_MAX(1_000_000) ) BTN_THR_DOWN_DEBOUNCER ( .clk(clk_50), .button_in(~btn_thr_down), .button_pulse(thr_down_pulse) );
-
-    // --- 소벨 임계값 제어 로직 ---
-    always @(posedge clk_50) begin
-        if (resend) begin // 리셋 (카메라 재설정 시)
-            sobel_threshold <= 8'd50; // 기본값으로 초기화
-        end else if (thr_up_pulse) begin
-            if (sobel_threshold < 8'd255) // 최대값 255
-                sobel_threshold <= sobel_threshold + 8;
-        end else if (thr_down_pulse) begin
-            if (sobel_threshold > 8'd0) // 최소값 0
-                sobel_threshold <= sobel_threshold - 8;
-        end
-    end
-    
-    // --- 듀얼 프레임 버퍼 로직 ---
-    // 320x240 = 76800 픽셀을 두 개의 RAM으로 분할 (각 32K x 16bit)
-    // RAM1: 주소 0 ~ 32767
-    // RAM2: 주소 32768 ~ 76799
-    wire [15:0] wraddress_ram1, wraddress_ram2;
-    wire [15:0] rdaddress_ram1, rdaddress_ram2;
-    wire [15:0] rddata_ram1, rddata_ram2;
-    wire wren_ram1, wren_ram2;
-=======
     // 소벨 임계값 조절 버튼 디바운싱 (업/다운) - 액티브 로우 동일 가정
     reg [19:0] btn_up_counter = 20'd0;
     reg [19:0] btn_down_counter = 20'd0;
@@ -165,7 +112,6 @@ module digital_cam_top (
         end
         btn_down_prev <= btn_down_pressed;
     end
->>>>>>> parent of 81b9c07 (디지털 카메라 모듈 및 필터 개선: OV7670 카메라 인터페이스와 VGA 출력 신호를 통합하여 시스템 구조를 최적화했습니다. 또한, 가우시안 블러 및 소벨 필터의 입력 및 출력 신호를 개선하고, 버튼 디바운싱 로직을 정리하여 코드의 가독성을 높였습니다. VGA 컨트롤러의 타이밍 및 주소 생성 로직을 수정하여 성능을 향상시켰습니다.)
 
     assign btn_up_rise = btn_up_pressed & ~btn_up_prev;
     assign btn_down_rise = btn_down_pressed & ~btn_down_prev;
@@ -244,102 +190,6 @@ module digital_cam_top (
     // 선언을 앞당겨 파이프라인 정렬 블록에서 참조 가능하게 함
     wire [7:0] filter_r_888, filter_g_888, filter_b_888;
 
-<<<<<<< HEAD
-    // 메모리 1사이클 지연 보정: VGA 제어 신호 1클럭 딜레이
-    always @(posedge clk_25_vga) begin
-        vga_active_area_d1 <= vga_active_area;
-        vga_vsync_raw_d1   <= vga_vsync_raw;
-        vga_hsync_raw_d1   <= vga_hsync_raw;
-        vga_blank_N_raw_d1 <= vga_blank_N_raw;
-    end
-
-    // 그레이스케일 변환 (Y = 0.299R + 0.587G + 0.114B)
-    // 정수 근사 연산: Y = (77*R + 150*G + 29*B) >> 8
-    wire [16:0] gray_sum;
-    // 곱셈을 시프트와 덧셈 연산으로 대체하여 하드웨어 효율성 향상
-    assign gray_sum = (r_888 << 6) + (r_888 << 3) + (r_888 << 2) + r_888      // 77*R = (64+8+4+1)*R
-                   + (g_888 << 7) + (g_888 << 4) + (g_888 << 2) + (g_888 << 1) // 150*G = (128+16+4+2)*G
-                   + (b_888 << 4) + (b_888 << 3) + (b_888 << 2) + b_888;     // 29*B = (16+8+4+1)*B
-    assign gray_value = vga_active_area_d1 ? gray_sum[15:8] : 8'h00;
-
-
-    // --- 파이프라인 지연 보상 ---
-    // 각 필터의 지연 시간(Latency) 정의
-    localparam GAUSS_LAT = 2; // 가우시안 필터 지연 (라인버퍼+연산)
-    localparam SOBEL_LAT = 2; // 소벨 필터 지연
-
-    // 파이프라인 총 지연 시간
-    localparam PIPE_LAT_BLUR1 = GAUSS_LAT;                      // 2
-    localparam PIPE_LAT_BLUR2 = PIPE_LAT_BLUR1 + GAUSS_LAT;     // 4
-    localparam PIPE_LAT_SOBEL = PIPE_LAT_BLUR2 + SOBEL_LAT;     // 6
-    localparam MAX_LATENCY    = PIPE_LAT_SOBEL;                // 최대 지연 시간: 6
-
-    // 신호 지연을 위한 레지스터 배열
-    reg [MAX_LATENCY-1:0] active_area_pipe;
-    reg [7:0] r_pipe [MAX_LATENCY-1:0], g_pipe [MAX_LATENCY-1:0], b_pipe [MAX_LATENCY-1:0];
-    reg [7:0] gray_pipe [MAX_LATENCY-1:0];
-    reg [7:0] blur2_pipe [MAX_LATENCY-1:0];
-    reg [7:0] sobel_pipe [MAX_LATENCY-1:0];
-    reg ready_blur2_pipe [MAX_LATENCY-1:0];
-    reg ready_sobel_pipe [MAX_LATENCY-1:0];
-
-    integer i;
-
-    // 파이프라인 레지스터 동작 (메모리 지연 반영: d1 신호 기준)
-    always @(posedge clk_25_vga) begin
-        // 0단계: 현재 신호 입력
-        active_area_pipe <= {active_area_pipe[MAX_LATENCY-2:0], vga_active_area_d1};        
-
-        for (i = 0; i < MAX_LATENCY; i = i + 1) begin
-            r_pipe[i] <= (i == 0) ? r_888 : r_pipe[i-1];
-            g_pipe[i] <= (i == 0) ? g_888 : g_pipe[i-1];
-            b_pipe[i] <= (i == 0) ? b_888 : b_pipe[i-1];
-            gray_pipe[i] <= (i == 0) ? gray_value : gray_pipe[i-1];
-            blur2_pipe[i] <= (i == 0) ? gray_blur2 : blur2_pipe[i-1];
-            sobel_pipe[i] <= (i == 0) ? sobel_out  : sobel_pipe[i-1];
-            ready_blur2_pipe[i] <= (i == 0) ? ready_blur2 : ready_blur2_pipe[i-1];
-            ready_sobel_pipe[i] <= (i == 0) ? ready_sobel : ready_sobel_pipe[i-1];
-        end
-    end
-
-
-    // --- 이미지 처리 필터 인스턴스 ---
-    // 1차 가우시안 블러 (노이즈 제거)
-    gaussian_3x3_gray8 gauss1 (
-        .clk(clk_25_vga), 
-        .enable(1'b1), 
-        .pixel_in(gray_value),
-        .pixel_addr(rdaddress), 
-        .vsync(vga_vsync_raw_d1), 
-        .active_area(vga_active_area_d1),
-        .pixel_out(gray_blur1), 
-        .filter_ready(ready_blur1)
-    );
-
-    // 2차 가우시안 블러 (더 강한 블러 효과)
-    gaussian_3x3_gray8 gauss2 (
-        .clk(clk_25_vga), 
-        .enable(ready_blur1), 
-        .pixel_in(gray_blur1),
-        .pixel_addr(rdaddress), 
-        .vsync(vga_vsync_raw_d1), 
-        .active_area(vga_active_area_d1),
-        .pixel_out(gray_blur2), 
-        .filter_ready(ready_blur2)
-    );
-
-    // 소벨 엣지 검출
-    sobel_3x3_gray8 sobel (
-        .clk(clk_25_vga), 
-        .enable(ready_blur2), 
-        .pixel_in(gray_blur2),
-        .pixel_addr(rdaddress), 
-        .vsync(vga_vsync_raw_d1), 
-        .active_area(vga_active_area_d1),
-        .threshold(sobel_threshold),
-        .pixel_out(sobel_out), 
-        .sobel_ready(ready_sobel)
-=======
     // 파이프라인 지연: 경로별 상이
     // - 가우시안 2회: 2클럭, 소벨 추가: 2클럭 → 총 4클럭
     // - 캐니 필터: 6클럭 지연 (가우시안 2 + 캐니 4)
@@ -462,7 +312,6 @@ module digital_cam_top (
         .threshold(sobel_threshold),
         .pixel_out(sobel_value),
         .sobel_ready(sobel_ready)
->>>>>>> parent of 81b9c07 (디지털 카메라 모듈 및 필터 개선: OV7670 카메라 인터페이스와 VGA 출력 신호를 통합하여 시스템 구조를 최적화했습니다. 또한, 가우시안 블러 및 소벨 필터의 입력 및 출력 신호를 개선하고, 버튼 디바운싱 로직을 정리하여 코드의 가독성을 높였습니다. VGA 컨트롤러의 타이밍 및 주소 생성 로직을 수정하여 성능을 향상시켰습니다.)
     );
 
     // 캐니 엣지 검출 (히스테리시스만 적용, NMS 생략) - 2차 가우시안 결과 입력
@@ -536,16 +385,6 @@ module digital_cam_top (
     assign vga_r = final_r;
     assign vga_g = final_g;
     assign vga_b = final_b;
-<<<<<<< HEAD
-
-
-    // --- 모듈 인스턴스화 ---
-    // PLL: 50MHz -> 24MHz (카메라), 25.175MHz (VGA)
-    my_altpll pll_inst (
-        .inclk0(clk_50), 
-        .c0(clk_24_camera), 
-        .c1(clk_25_vga)
-=======
     
     // PLL 인스턴스 - 클럭 생성 (IP 설정 필요)
     // 입력: 50MHz, 출력 c0: 50MHz, c1: 25MHz
@@ -554,7 +393,6 @@ module digital_cam_top (
         .c0(clk_24_camera),        // 카메라용 24MHz 클럭
         .c1(clk_25_vga)            // VGA용 25MHz 클럭
 
->>>>>>> parent of 81b9c07 (디지털 카메라 모듈 및 필터 개선: OV7670 카메라 인터페이스와 VGA 출력 신호를 통합하여 시스템 구조를 최적화했습니다. 또한, 가우시안 블러 및 소벨 필터의 입력 및 출력 신호를 개선하고, 버튼 디바운싱 로직을 정리하여 코드의 가독성을 높였습니다. VGA 컨트롤러의 타이밍 및 주소 생성 로직을 수정하여 성능을 향상시켰습니다.)
     );
     
     // VGA 동기화 신호 지연용 원본 신호
@@ -562,7 +400,6 @@ module digital_cam_top (
 
     // VGA 컨트롤러
     VGA vga_inst (
-<<<<<<< HEAD
         .CLK25(clk_25_vga), 
         .pixel_data(rddata), 
         .clkout(vga_CLK),
@@ -573,29 +410,6 @@ module digital_cam_top (
         .activeArea(vga_active_area), 
         .pixel_address(rdaddress)
     );
-
-    // Hsync/Vsync/Nblank 파이프라인 지연 (RAM 딜레이 1사이클 포함을 위해 d1 신호 사용)
-    reg [MAX_LATENCY-1:0] hsync_pipe, vsync_pipe, nblank_pipe;
-    always @(posedge clk_25_vga) begin
-        hsync_pipe <= {hsync_pipe[MAX_LATENCY-2:0], vga_hsync_raw_d1};
-        vsync_pipe <= {vsync_pipe[MAX_LATENCY-2:0], vga_vsync_raw_d1};
-        nblank_pipe <= {nblank_pipe[MAX_LATENCY-2:0], vga_blank_N_raw_d1};
-    end
-    assign vga_hsync = hsync_pipe[MAX_LATENCY-1];
-    assign vga_vsync = vsync_pipe[MAX_LATENCY-1];
-    assign vga_blank_N = nblank_pipe[MAX_LATENCY-1];
-=======
-        .CLK25(clk_25_vga),        // 25MHz VGA 클럭
-        .pixel_data(rddata),       // 픽셀 데이터 입력
-        .clkout(vga_CLK),          // VGA 클럭 출력
-        .Hsync(hsync_raw),         // 수평 동기화 (원본)
-        .Vsync(vsync_raw),         // 수직 동기화 (원본)
-        .Nblank(nBlank),           // 블랭킹 신호
-        .Nsync(vga_sync_N),        // 동기화 신호
-        .activeArea(activeArea),   // 활성 영역
-        .pixel_address(rdaddress)  // 픽셀 주소 출력
-    );
-
     // Hsync/Vsync를 데이터 경로 지연과 일치시키기 위한 파이프라인 (6클럭 지연)
     reg [5:0] hsync_delay_pipe = 6'b0;
     reg [5:0] vsync_delay_pipe = 6'b0;
@@ -606,53 +420,9 @@ module digital_cam_top (
 
     assign vga_hsync = hsync_delay_pipe[5];
     assign vga_vsync = vsync_delay_pipe[5];
->>>>>>> parent of 81b9c07 (디지털 카메라 모듈 및 필터 개선: OV7670 카메라 인터페이스와 VGA 출력 신호를 통합하여 시스템 구조를 최적화했습니다. 또한, 가우시안 블러 및 소벨 필터의 입력 및 출력 신호를 개선하고, 버튼 디바운싱 로직을 정리하여 코드의 가독성을 높였습니다. VGA 컨트롤러의 타이밍 및 주소 생성 로직을 수정하여 성능을 향상시켰습니다.)
-    
+   
     // OV7670 카메라 컨트롤러
     ov7670_controller camera_ctrl (
-<<<<<<< HEAD
-        .clk_50(clk_50), 
-        .clk_24(clk_24_camera), 
-        .resend(resend),
-        .config_finished(led_config_finished),
-        .sioc(ov7670_sioc), 
-        .siod(ov7670_siod),
-        .reset(ov7670_reset), 
-        .pwdn(ov7670_pwdn), 
-        .xclk(ov7670_xclk)
-    );
-    
-    // OV7670 캡처 모듈
-    ov7670_capture capture_inst (
-        .pclk(ov7670_pclk), 
-        .vsync(ov7670_vsync), 
-        .href(ov7670_href), 
-        .d(ov7670_data),
-        .addr(wraddress), 
-        .dout(wrdata), 
-        .we(wren)
-    );
-    
-    // 듀얼 프레임 버퍼 RAM
-    frame_buffer_ram ram1 (
-        .data(wrdata), 
-        .wraddress(wraddress_ram1), 
-        .wrclock(ov7670_pclk), 
-        .wren(wren_ram1),
-        .rdaddress(rdaddress_ram1), 
-        .rdclock(clk_25_vga), 
-        .q(rddata_ram1)
-    );
-    frame_buffer_ram ram2 (
-        .data(wrdata), 
-        .wraddress(wraddress_ram2), 
-        .wrclock(ov7670_pclk), 
-        .wren(wren_ram2),
-        .rdaddress(rdaddress_ram2), 
-        .rdclock(clk_25_vga), 
-        .q(rddata_ram2)
-    );
-=======
         .clk_50(clk_50),           // 50MHz 카메라 클럭
         .clk_24(clk_24_camera),    // 24MHz 카메라 클럭
         .resend(resend),           // 설정 재시작
@@ -682,7 +452,6 @@ module digital_cam_top (
     
     // 읽기 주소 동기화
     wire [16:0] rdaddress_sync = rdaddress;
->>>>>>> parent of 81b9c07 (디지털 카메라 모듈 및 필터 개선: OV7670 카메라 인터페이스와 VGA 출력 신호를 통합하여 시스템 구조를 최적화했습니다. 또한, 가우시안 블러 및 소벨 필터의 입력 및 출력 신호를 개선하고, 버튼 디바운싱 로직을 정리하여 코드의 가독성을 높였습니다. VGA 컨트롤러의 타이밍 및 주소 생성 로직을 수정하여 성능을 향상시켰습니다.)
 
     // 듀얼 프레임 버퍼 RAM들 - 각각 32K x 12비트로 구성
     // RAM1: 이미지의 첫 번째 절반 저장 (픽셀 0-32767)

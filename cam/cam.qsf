@@ -114,7 +114,6 @@ set_location_assignment PIN_AC28 -to sw_filter
 set_location_assignment PIN_N21 -to btn_thr_down
 set_location_assignment PIN_R24 -to btn_thr_up
 set_location_assignment PIN_AD27 -to sw_canny
-set_global_assignment -name VERILOG_FILE debounce.v
 set_global_assignment -name VERILOG_FILE canny_3x3_gray8.v
 set_global_assignment -name VERILOG_FILE sobel_3x3_gray8.v
 set_global_assignment -name VERILOG_FILE gaussian_3x3_gray8.v
