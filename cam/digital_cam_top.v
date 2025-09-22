@@ -3,8 +3,6 @@
 module digital_cam_top (
     input  wire        clk_50,         // 50MHz 시스템 클럭
     input  wire        btn_resend,     // 카메라 설정 재시작 버튼
-    input  wire        btn_thr_up,     // 소벨 임계 증가 버튼 (액티브 로우 가정 시 디바운싱 동일 처리)
-    input  wire        btn_thr_down,   // 소벨 임계 감소 버튼
     input  wire        sw_grayscale,   // SW[0] 그레이스케일 모드 스위치
     input  wire        sw_sobel,       // SW[1] 소벨 필터 모드 스위치
     input  wire        sw_filter,      // SW[2] 디지털 필터 모드 스위치
@@ -76,57 +74,6 @@ module digital_cam_top (
     end
     
     assign btn_rising_edge = btn_pressed & ~btn_pressed_prev;  // 상승 에지 감지
-
-    // 소벨 임계값 조절 버튼 디바운싱 (업/다운) - 액티브 로우 동일 가정
-    reg [19:0] btn_up_counter = 20'd0;
-    reg [19:0] btn_down_counter = 20'd0;
-    reg btn_up_pressed = 1'b0;
-    reg btn_down_pressed = 1'b0;
-    reg btn_up_prev = 1'b0;
-    reg btn_down_prev = 1'b0;
-    wire btn_up_rise;
-    wire btn_down_rise;
-
-    always @(posedge clk_50) begin
-        // UP
-        if (btn_thr_up == 1'b0) begin
-            if (btn_up_counter < 20'd1000000)
-                btn_up_counter <= btn_up_counter + 1'b1;
-            else
-                btn_up_pressed <= 1'b1;
-        end else begin
-            btn_up_counter <= 20'd0;
-            btn_up_pressed <= 1'b0;
-        end
-        btn_up_prev <= btn_up_pressed;
-
-        // DOWN
-        if (btn_thr_down == 1'b0) begin
-            if (btn_down_counter < 20'd1000000)
-                btn_down_counter <= btn_down_counter + 1'b1;
-            else
-                btn_down_pressed <= 1'b1;
-        end else begin
-            btn_down_counter <= 20'd0;
-            btn_down_pressed <= 1'b0;
-        end
-        btn_down_prev <= btn_down_pressed;
-    end
-
-    assign btn_up_rise = btn_up_pressed & ~btn_up_prev;
-    assign btn_down_rise = btn_down_pressed & ~btn_down_prev;
-
-    // 소벨 임계값 레지스터 (포화 증감)
-    reg [7:0] sobel_threshold = 8'd32; // 기본 임계값
-    always @(posedge clk_50) begin
-        if (btn_up_rise) begin
-            if (sobel_threshold != 8'hFF)
-                sobel_threshold <= sobel_threshold + 8'd4;
-        end else if (btn_down_rise) begin
-            if (sobel_threshold != 8'h00)
-                sobel_threshold <= sobel_threshold - 8'd4;
-        end
-    end
     
     // 신호 연결
     assign resend = btn_rising_edge;  // 버튼 상승 에지에서 리셋 펄스 전송
@@ -170,9 +117,9 @@ module digital_cam_top (
     // RGB888: R[7:0] G[7:0] B[7:0]
     wire [7:0] r_888, g_888, b_888;  // RGB888로 확장된 값들
     
-    assign r_888 = {rddata[15:11], 3'b111};  // 5비트 → 8비트 비트복제
-    assign g_888 = {rddata[10:5], 2'b11};   // 6비트 → 8비트 비트복제
-    assign b_888 = {rddata[4:0],  3'b11};    // 5비트 → 8비트 비트복제
+    assign r_888 = {rddata[15:11], rddata[15:13]};  // 5비트 → 8비트 비트복제
+    assign g_888 = {rddata[10:5],  rddata[10:9]};   // 6비트 → 8비트 비트복제
+    assign b_888 = {rddata[4:0],   rddata[4:2]};    // 5비트 → 8비트 비트복제
     
     // RGB888을 하나의 24비트 픽셀로 결합 (필터 입력용)
     wire [23:0] rgb888_pixel = {r_888, g_888, b_888};
@@ -191,27 +138,23 @@ module digital_cam_top (
     wire [7:0] filter_r_888, filter_g_888, filter_b_888;
 
     // 파이프라인 지연: 경로별 상이
-    // - 가우시안 2회: 2클럭, 소벨 추가: 2클럭 → 총 4클럭
-    // - 캐니 필터: 6클럭 지연 (가우시안 2 + 캐니 4)
+    // - 가우시안: 2클럭, 소벨 추가: 2클럭 → 총 4클럭 (소벨이 최대)
     localparam integer GAUSS_LAT = 2;
     localparam integer SOBEL_EXTRA_LAT = 2;
-    localparam integer PIPE_LATENCY = 6; // VGA Hsync/Vsync 지연(6)과 일치
-    localparam integer MAX_LATENCY = 6; // 캐니 필터를 위한 최대 지연
-    reg [16:0] rdaddress_delayed [MAX_LATENCY:0];      // rdaddress delayed value
-    reg activeArea_delayed [MAX_LATENCY:0];            // active area delayed value
-    reg [7:0] red_value_delayed [MAX_LATENCY:0];       // red delayed value
-    reg [7:0] green_value_delayed [MAX_LATENCY:0];     // green delayed value
-    reg [7:0] blue_value_delayed [MAX_LATENCY:0];      // blue delayed value
-    reg [7:0] gray_value_delayed [MAX_LATENCY:0];      // gray delayed value
-    reg [23:0] filtered_pixel_delayed [MAX_LATENCY:0]; // filtered pixel delayed value
-    reg [7:0] filter_r_delayed [MAX_LATENCY:0];        // filter r delayed value
-    reg [7:0] filter_g_delayed [MAX_LATENCY:0];        // filter g delayed value
-    reg [7:0] filter_b_delayed [MAX_LATENCY:0];        // filter b delayed value
-    reg [7:0] sobel_value_delayed [MAX_LATENCY:0];     // sobel value delayed value
-    reg [7:0] canny_value_delayed [MAX_LATENCY:0];     // canny value delayed value
-    reg       filter_ready_delayed [MAX_LATENCY:0];     // filter ready delayed
-    reg       sobel_ready_delayed  [MAX_LATENCY:0];     // sobel ready delayed
-    reg       canny_ready_delayed  [MAX_LATENCY:0];     // canny ready delayed
+    localparam integer PIPE_LATENCY = GAUSS_LAT + SOBEL_EXTRA_LAT; // 4
+    reg [16:0] rdaddress_delayed [PIPE_LATENCY:0];      // rdaddress delayed value
+    reg activeArea_delayed [PIPE_LATENCY:0];            // active area delayed value
+    reg [7:0] red_value_delayed [PIPE_LATENCY:0];       // red delayed value
+    reg [7:0] green_value_delayed [PIPE_LATENCY:0];     // green delayed value
+    reg [7:0] blue_value_delayed [PIPE_LATENCY:0];      // blue delayed value
+    reg [7:0] gray_value_delayed [PIPE_LATENCY:0];      // gray delayed value
+    reg [23:0] filtered_pixel_delayed [PIPE_LATENCY:0]; // filtered pixel delayed value
+    reg [7:0] filter_r_delayed [PIPE_LATENCY:0];        // filter r delayed value
+    reg [7:0] filter_g_delayed [PIPE_LATENCY:0];        // filter g delayed value
+    reg [7:0] filter_b_delayed [PIPE_LATENCY:0];        // filter b delayed value
+    reg [7:0] sobel_value_delayed [PIPE_LATENCY:0];     // sobel value delayed value
+    reg       filter_ready_delayed [PIPE_LATENCY:0];     // filter ready delayed
+    reg       sobel_ready_delayed  [PIPE_LATENCY:0];     // sobel ready delayed
     integer i; 
     
 	// 파이프라인 정렬: 정상 상태 기준 PIPE_LATENCY 클럭 지연 체인
@@ -275,8 +218,8 @@ module digital_cam_top (
         end
     end
 
-    // 가우시안 블러 1차 (그레이스케일 8비트)
-    wire [7:0] gray_blur1;
+    // 가우시안 블러 (그레이스케일 8비트)
+    wire [7:0] gray_blur;
     gaussian_3x3_gray8 gaussian_gray_inst (
         .clk(clk_25_vga),
         .enable(1'b1),
@@ -284,32 +227,18 @@ module digital_cam_top (
         .pixel_addr(rdaddress),
         .vsync(vSync),
         .active_area(activeArea),
-        .pixel_out(gray_blur1),
+        .pixel_out(gray_blur),
         .filter_ready(filter_ready)
-    );
-
-    // 가우시안 블러 2차 (강도 상승)
-    wire [7:0] gray_blur2;
-    gaussian_3x3_gray8 gaussian_gray2_inst (
-        .clk(clk_25_vga),
-        .enable(filter_ready),
-        .pixel_in(gray_blur1),
-        .pixel_addr(rdaddress),
-        .vsync(vSync),
-        .active_area(activeArea),
-        .pixel_out(gray_blur2),
-        .filter_ready(filter_ready2)
     );
 
     // 소벨 엣지 검출 (그레이스케일 8비트) - 2차 가우시안 결과 입력
     sobel_3x3_gray8 sobel_inst (
         .clk(clk_25_vga),
-        .enable(filter_ready2),
-        .pixel_in(gray_blur2),
+        .enable(1'b1),
+        .pixel_in(gray_blur),
         .pixel_addr(rdaddress),
         .vsync(vSync),
         .active_area(activeArea),
-        .threshold(sobel_threshold),
         .pixel_out(sobel_value),
         .sobel_ready(sobel_ready)
     );
@@ -335,9 +264,9 @@ module digital_cam_top (
     assign green_value = activeArea ? g_888 : 8'h00;
     assign blue_value = activeArea ? b_888 : 8'h00;
     
-    // 그레이스케일 샤프닝(언샤프 마스크): gray + 0.5*(gray - gray_blur2)
+    // 그레이스케일 샤프닝(언샤프 마스크): gray + 0.5*(gray - gray_blur)
     wire signed [9:0] g_gray  = {2'b00, gray_value};
-    wire signed [9:0] g_blur  = {2'b00, gray_blur2};
+    wire signed [9:0] g_blur  = {2'b00, gray_blur};
     wire signed [10:0] g_unsharp_w = g_gray + ((g_gray - g_blur) >>> 1); // 50% 가중
     wire [7:0] unsharp_gray = g_unsharp_w[10] ? 8'd0 : (g_unsharp_w > 11'sd255 ? 8'd255 : g_unsharp_w[7:0]);
     assign filtered_pixel = {unsharp_gray, unsharp_gray, unsharp_gray};

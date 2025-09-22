@@ -42,43 +42,36 @@ module gaussian_3x3_gray8 (
     // stage-1 accumulators (max 16*255 = 4080 -> 12 bits)
     reg [11:0] sum_blur = 12'd0;
 
-     // per-line horizontal position within active_area (0..319)
-    reg [8:0] hpos = 9'd0;  // 9비트로 충분 (0~319)
-    
-    wire window_valid = enable && reset_done && valid_addr && active_area; // hpos check is removed for simplicity, reset_done handles priming
-
-    reg [7:0] line_start_pixel;
-    wire [7:0] effective_pixel_in;
 
     // line/window maintenance
     always @(posedge clk) begin
         if ((vsync && !vsync_prev) || (active_area && !active_prev)) begin
             reset_done   <= 1'b0;
-            hpos <= 9'd0; // Synchronize hpos reset
-            // Clear caches at the start of a frame or line
+            init_counter <= 3'd0;
             cache1[0] <= 8'h00; cache1[1] <= 8'h00; cache1[2] <= 8'h00;
             cache2[0] <= 8'h00; cache2[1] <= 8'h00; cache2[2] <= 8'h00;
             cache3[0] <= 8'h00; cache3[1] <= 8'h00; cache3[2] <= 8'h00;
-        end else if (enable && active_area) begin
-            // Increment hpos
-            if (hpos < 9'd319) hpos <= hpos + 1'b1;
+        end else if (enable && valid_addr && active_area) begin
+            if (!reset_done) begin
+                if (init_counter < 3'd5) begin
+                    init_counter <= init_counter + 1'b1;
+                    cache1[0] <= 8'h00; cache1[1] <= 8'h00; cache1[2] <= 8'h00;
+                    cache2[0] <= 8'h00; cache2[1] <= 8'h00; cache2[2] <= 8'h00;
+                    cache3[0] <= 8'h00; cache3[1] <= 8'h00; cache3[2] <= 8'h00;
+                end else begin
+                    reset_done <= 1'b1;
+                    cache1[0] <= cache1[1];
+                    cache1[1] <= cache1[2];
+                    cache1[2] <= cache2[1];
 
-            // Capture the very first pixel of an active line for padding
-            if (hpos == 0) begin
-                line_start_pixel <= pixel_in;
-            end
-            
-            // Determine the pixel to shift in (padding for the first 2 pixels)
-            
-            // Always shift the window registers
-            cache1[0] <= cache1[1]; cache1[1] <= cache1[2]; cache1[2] <= cache2[1];
-            cache2[0] <= cache2[1]; cache2[1] <= cache2[2]; cache2[2] <= cache3[1];
-            cache3[0] <= cache3[1]; cache3[1] <= cache3[2];
-            cache3[2] <= effective_pixel_in;
-            
-            // The pipeline is ready after the first 2 pixels have been used to prime the filter
-            if (hpos >= 2) begin
-                reset_done <= 1'b1;
+                    cache2[0] <= cache2[1];
+                    cache2[1] <= cache2[2];
+                    cache2[2] <= cache3[1];
+
+                    cache3[0] <= cache3[1];
+                    cache3[1] <= cache3[2];
+                    cache3[2] <= pixel_in;
+                end
             end else begin
                 reset_done <= 1'b0;
             end
@@ -91,7 +84,7 @@ module gaussian_3x3_gray8 (
 
     // stage 1: weighted sum (kernel /16)
     always @(posedge clk) begin
-        if (window_valid) begin
+        if (enable && reset_done && valid_addr && active_area) begin
             sum_blur <= (g00 + g02 + g20 + g22)
                       + ((g01 + g10 + g12 + g21) << 1)
                       + (g11 << 2);
@@ -102,7 +95,7 @@ module gaussian_3x3_gray8 (
 
     // stage 2: normalize and output
     always @(posedge clk) begin
-        if (window_valid) begin
+        if (enable && reset_done && valid_addr && active_area) begin
             pixel_out   <= sum_blur[11:4]; // divide by 16
             filter_ready <= 1'b1;
         end else begin
