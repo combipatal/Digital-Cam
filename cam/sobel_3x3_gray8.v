@@ -1,117 +1,132 @@
-// 3x3 소벨 엣지 검출 필터 (8비트 그레이스케일 입력)
-// 이미지의 수평 및 수직 방향 밝기 변화(그래디언트)를 계산하여 엣지를 검출
+// 3x3 Sobel filter for 8-bit grayscale
 module sobel_3x3_gray8 (
     input  wire        clk,
-    input  wire        enable,          // 모듈 동작 활성화 신호
-    input  wire [7:0]  pixel_in,      // 입력 픽셀 데이터
-    input  wire [16:0] pixel_addr,    // 현재 픽셀의 주소
-    input  wire        vsync,           // 수직 동기화 신호
-    input  wire        active_area,     // 유효 영상 영역 신호
-    input  wire [7:0]  threshold,       // 엣지 판별을 위한 임계값
-    output reg  [7:0]  pixel_out,     // 필터링된 출력 픽셀 (바이너리 엣지맵)
-    output reg         sobel_ready      // 필터 출력 유효 신호
+    input  wire        enable,
+    input  wire [7:0]  pixel_in,
+    input  wire [16:0] pixel_addr,
+    input  wire        vsync,
+    input  wire        active_area,
+    input  wire [7:0]  threshold,   // 임계값 입력
+    output reg  [7:0]  pixel_out,
+    output reg         sobel_ready
 );
 
-    // 이미지 해상도 정의
-    localparam H_ACTIVE = 320;
-    localparam V_ACTIVE = 240;
-
-    // 라인 버퍼 2개
-    reg [7:0] line_buffer1 [0:H_ACTIVE-1];
-    reg [7:0] line_buffer2 [0:H_ACTIVE-1];
-
-    // 현재 픽셀 시프트 레지스터
-    reg [7:0] p_reg1, p_reg2, p_reg3;
-
-    // 3x3 윈도우 픽셀
-    wire [7:0] w00, w01, w02, w10, w11, w12, w20, w21, w22;
-
-    // 카운터 및 경계 감지
-    reg  [8:0] h_count = 9'd0;
-    reg  [8:0] v_count = 9'd0;
-    wire is_first_col, is_last_col;
-    
+    // init and vsync edge
     reg vsync_prev = 1'b0;
     reg active_prev = 1'b0;
-
-    // 파이프라인 레지스터
-    reg [10:0] mag_pipe1;
-    reg window_valid_pipe1;
-
-    // 카운터 로직
     always @(posedge clk) begin
         vsync_prev <= vsync;
         active_prev <= active_area;
-
-        // Active area 내에서 카운터 동작, 그 외에는 리셋
-        if (enable && active_area && active_prev) begin
-            if (h_count == H_ACTIVE - 1) begin // 라인의 끝
-                h_count <= 9'd0;
-                v_count <= v_count + 1;
-            end else begin // 라인 진행 중
-                h_count <= h_count + 1;
-            end
-        end else begin // 프레임 시작 또는 비활성 영역
-            h_count <= 9'd0;
-            v_count <= 9'd0;
-        end
     end
 
-    assign is_first_col = (h_count == 0);
-    assign is_last_col  = (h_count == H_ACTIVE - 1);
+   
+    reg        reset_done = 1'b0;
+    reg [1:0]  init_counter = 2'd0; 
 
-    // 라인 버퍼 및 시프트 레지스터
+    // 3x3 caches
+    reg [7:0] cache1 [0:2];
+    reg [7:0] cache2 [0:2];
+    reg [7:0] cache3 [0:2];
+
+    wire valid_addr = 1'b1;
+    wire window_valid = enable && reset_done && valid_addr && active_area;
+
+    wire [7:0] p00 = cache1[0];
+    wire [7:0] p01 = cache1[1];
+    wire [7:0] p02 = cache1[2];
+    wire [7:0] p10 = cache2[0];
+    wire [7:0] p11 = cache2[1];
+    wire [7:0] p12 = cache2[2];
+    wire [7:0] p20 = cache3[0];
+    wire [7:0] p21 = cache3[1];
+    wire [7:0] p22 = cache3[2];
+
+    // line/window maintenance
     always @(posedge clk) begin
-        if (enable && active_area) begin
-            line_buffer2[h_count] <= pixel_in;
-            if (!is_last_col) line_buffer1[h_count + 1] <= line_buffer2[h_count];
-            p_reg3 <= pixel_in;
-            p_reg2 <= p_reg3;
-            p_reg1 <= p_reg2;
-        end
-    end
+        // 프레임 시작 또는 라인 시작 시 윈도우 초기화
+        if ((vsync && !vsync_prev) || (active_area && !active_prev)) begin
+            reset_done   <= 1'b0;
+            init_counter <= 2'd0;
+            cache1[0] <= 8'h00; cache1[1] <= 8'h00; cache1[2] <= 8'h00;
+            cache2[0] <= 8'h00; cache2[1] <= 8'h00; cache2[2] <= 8'h00;
+            cache3[0] <= 8'h00; cache3[1] <= 8'h00; cache3[2] <= 8'h00;
+        end else if (enable && valid_addr && active_area) begin
+            if (!reset_done) begin
+                if (init_counter < 2'd2) begin
+                    init_counter <= init_counter + 1'b1;
+                    cache1[0] <= 8'h00; cache1[1] <= 8'h00; cache1[2] <= 8'h00;
+                    cache2[0] <= 8'h00; cache2[1] <= 8'h00; cache2[2] <= 8'h00;
+                    cache3[0] <= 8'h00; cache3[1] <= 8'h00; cache3[2] <= 8'h00;
+                end else begin
+                    reset_done <= 1'b1;
+                    cache1[0] <= cache1[1];
+                    cache1[1] <= cache1[2];
+                    cache1[2] <= cache2[1];
 
-    // 3x3 윈도우 구성
-    assign w01 = line_buffer1[h_count];
-    assign w00 = is_first_col ? w01 : line_buffer1[h_count-1];
-    assign w02 = is_last_col  ? w01 : line_buffer1[h_count+1];
-    assign w11 = line_buffer2[h_count];
-    assign w10 = is_first_col ? w11 : line_buffer2[h_count-1];
-    assign w12 = is_last_col  ? w11 : line_buffer2[h_count+1];
-    assign w21 = p_reg3;
-    assign w20 = p_reg2;
-    assign w22 = p_reg1;
-    
-    wire window_valid = (v_count > 1) && (h_count > 1);
+                    cache2[0] <= cache2[1];
+                    cache2[1] <= cache2[2];
+                    cache2[2] <= cache3[1];
 
-    // 1단계 파이프라인: Gx, Gy 그래디언트 및 크기(magnitude) 계산
-    // Gx = [-1 0 +1; -2 0 +2; -1 0 +1], Gy = [+1 +2 +1; 0 0 0; -1 -2 -1]
-    wire signed [10:0] gx = (w02 + (w12 << 1) + w22) - (w00 + (w10 << 1) + w20);
-    wire signed [10:0] gy = (w00 + (w01 << 1) + w02) - (w20 + (w21 << 1) + w22);
-    wire [10:0] gx_abs = gx[10] ? -gx : gx;
-    wire [10:0] gy_abs = gy[10] ? -gy : gy;
-    
-    always @(posedge clk) begin
-        window_valid_pipe1 <= window_valid && enable && active_area;
-        if (window_valid && enable && active_area) begin
-            mag_pipe1 <= gx_abs + gy_abs; // 그래디언트 크기 근사치 (|Gx|+|Gy|)
-        end else begin
-            mag_pipe1 <= 11'd0;
-        end
-    end
-
-    // 2단계 파이프라인: 임계값 비교 및 출력
-    always @(posedge clk) begin
-        if (window_valid_pipe1) begin
-            // 그래디언트 크기가 임계값보다 크면 엣지로 판단 (흰색), 아니면 배경 (검은색)
-            if (mag_pipe1 > {3'b0, threshold}) begin
-                pixel_out <= 8'hFF;
+                    cache3[0] <= cache3[1];
+                    cache3[1] <= cache3[2];
+                    cache3[2] <= pixel_in;
+                end
             end else begin
-                pixel_out <= 8'h00;
+                cache1[0] <= cache1[1];
+                cache1[1] <= cache1[2];
+                cache1[2] <= cache2[1];
+
+                cache2[0] <= cache2[1];
+                cache2[1] <= cache2[2];
+                cache2[2] <= cache3[1];
+
+                cache3[0] <= cache3[1];
+                cache3[1] <= cache3[2];
+                cache3[2] <= pixel_in;
+            end
+        end
+    end
+
+
+    // sobel compute (1 clock)
+    // Gx = [-1 0 +1; -2 0 +2; -1 0 +1]
+    // Gy = [+1 +2 +1;  0 0  0; -1 -2 -1]
+    reg [10:0] gx_abs;
+    reg [10:0] gy_abs;
+    reg [10:0] mag;
+    // Precompute partial sums as wires to avoid block-local reg declarations
+    wire [10:0] gx_pos = {3'b000,p02} + {2'b00,p12,1'b0} + {3'b000,p22};
+    wire [10:0] gx_neg = {3'b000,p00} + {2'b00,p10,1'b0} + {3'b000,p20};
+    wire [10:0] gy_pos = {3'b000,p00} + {2'b00,p01,1'b0} + {3'b000,p02};
+    wire [10:0] gy_neg = {3'b000,p20} + {2'b00,p21,1'b0} + {3'b000,p22};
+    always @(posedge clk) begin
+        if (window_valid) begin
+            // compute |gx| and |gy| using precomputed wires
+            gx_abs <= (gx_pos >= gx_neg) ? (gx_pos - gx_neg) : (gx_neg - gx_pos);
+            gy_abs <= (gy_pos >= gy_neg) ? (gy_pos - gy_neg) : (gy_neg - gy_pos);
+            // magnitude approx = min(255, gx_abs + gy_abs)
+            mag <= gx_abs + gy_abs;
+        end else begin
+            gx_abs <= 11'd0;
+            gy_abs <= 11'd0;
+            mag    <= 11'd0;
+        end
+    end
+
+    // clamp & output (버튼 조절 임계값 기반 바이너리 엣지)
+    always @(posedge clk) begin
+        if (window_valid) begin
+            // 포화 체크 후 8비트로 클램프
+            // 이후 임계값 비교로 바이너리 엣지 맵 생성
+            // mag > 255 이면 255로 취급
+            if (mag[10:8] != 3'b000) begin
+                pixel_out <= (8'hFF > threshold) ? 8'hFF : 8'h00;
+            end else begin
+                pixel_out <= (mag[7:0] > threshold) ? 8'hFF : 8'h00;
             end
             sobel_ready <= 1'b1;
         end else begin
-            pixel_out   <= 8'h00;
+            pixel_out   <= 8'h00;  // 초기화 중 또는 비활성 영역에서 검은색
             sobel_ready <= 1'b0;
         end
     end

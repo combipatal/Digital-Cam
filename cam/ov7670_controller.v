@@ -9,10 +9,10 @@ module ov7670_controller (
     inout  wire       siod,             // I2C 데이터 신호 (양방향)
     output wire       reset,            // 카메라 리셋 신호
     output wire       pwdn,             // 카메라 파워다운 신호
-    output wire       xclk              // 카메라 클럭 신호 (24MHz)
+    output wire       xclk              // 카메라 클럭 신호 (25MHz)
 );
 
-    wire [15:0] command;       // I2C 명령어 (상위 8비트: 레지스터 주소, 하위 8비트: 데이터)
+    wire [15:0] command;       // I2C 명령어 (상위8비트: 레지스터주소, 하위8비트: 데이터)
     wire finished;             // 설정 완료 신호
     wire taken;                // I2C 전송 완료 신호
     wire send;                 // I2C 전송 시작 신호
@@ -136,26 +136,24 @@ module ov7670_registers (
         
         // 레지스터 설정 시퀀스 - OV7670 카메라 초기화를 위한 레지스터 값들
         case (address)
-            8'h00: command <= 16'h1280; // COM7: 카메라 리셋 (리셋 후 잠시 대기 필요)
+            8'h00: command <= 16'h1280; // COM7: 카메라 리셋
             
             // --- 화이트 밸런스 수동 설정 (붉은기 감소) ---
             8'h01: command <= 16'h0180; // BLUE: 파란색 채널 게인 (기본값)
-            8'h02: command <= 16'h0260; // RED:  빨간색 채널 게인 (기본값 대비 낮춤)
+            8'h02: command <= 16'h0260; // RED:  빨간색 채널 게인 (낮춤)
             8'h03: command <= 16'h13E7; // COM8: AWB 비활성화, AGC/AEC 활성화
+            // --- 화이트 밸런스 설정 끝 ---
             
-            // --- 출력 포맷 및 크기 설정 ---
-            8'h04: command <= 16'h1214; // COM7: QVGA(320x240), RGB 포맷 설정
-            8'h05: command <= 16'h1100; // CLKRC: 클럭 프리스케일러 (내부 클럭 조절)
-            8'h06: command <= 16'h0C00; // COM3: 크기 및 스케일링 관련 설정
-            8'h07: command <= 16'h3E00; // COM14: 스케일링 및 PCLK 제어
-            8'h08: command <= 16'h4010; // COM15: 데이터 범위 [0-FF], RGB 565 포맷 설정
+            8'h04: command <= 16'h1204; // COM7: 크기 및 RGB 출력 설정
+            8'h05: command <= 16'h1100; // CLKRC: 클럭 프리스케일러
+            8'h06: command <= 16'h0C00; // COM3: 일반 설정
+            8'h07: command <= 16'h3E00; // COM14: 스케일링 설정
+            8'h08: command <= 16'h0400; // COM1: 수평 오프셋
+            8'h09: command <= 16'h4010; // COM15: RGB 565 포맷 설정
+            8'h0A: command <= 16'h3A04; // TSLB: YUV 순서 설정
+            8'h0B: command <= 16'h1438; // COM9: AGC 게인 설정
             
-            // --- 이미지 품질 및 기타 설정 ---
-            8'h09: command <= 16'h0400; // COM1: 수직 오프셋 (필요 시 조정)
-            8'h0A: command <= 16'h3A04; // TSLB: YUV 순서 (RGB 모드에서는 영향 적음)
-            8'h0B: command <= 16'h1438; // COM9: AGC 게인 설정 (최대 4x)
-            
-            // --- 색상 매트릭스 설정 (YUV to RGB 변환 계수, RGB 모드에서도 영향) ---
+            // --- 색상 매트릭스 설정 (YUV to RGB 변환) ---
             8'h0C: command <= 16'h4F40; // MTX1: 색상 매트릭스 계수 1
             8'h0D: command <= 16'h5034; // MTX2: 색상 매트릭스 계수 2
             8'h0E: command <= 16'h510C; // MTX3: 색상 매트릭스 계수 3
@@ -164,49 +162,45 @@ module ov7670_registers (
             8'h11: command <= 16'h5440; // MTX6: 색상 매트릭스 계수 6
             
             8'h12: command <= 16'h581E; // MTXS: 색상 매트릭스 스케일
-            8'h13: command <= 16'h3DC0; // COM13: 감마, UV 옵션 설정
-            
-            // --- 해상도 및 프레임 창 설정 (QVGA 기준) ---
+            8'h13: command <= 16'h3DC0; // COM13: 감마 설정
             8'h14: command <= 16'h1711; // HSTART: 수평 시작 위치
             8'h15: command <= 16'h1861; // HSTOP: 수평 종료 위치
             8'h16: command <= 16'h32A4; // HREF: 수평 참조 설정
             8'h17: command <= 16'h1903; // VSTART: 수직 시작 위치
             8'h18: command <= 16'h1A7B; // VSTOP: 수직 종료 위치
             8'h19: command <= 16'h030A; // VREF: 수직 참조 설정
-            
-            // --- 기타 제어 레지스터 ---
-            8'h1A: command <= 16'h0E61; // COM5
-            8'h1B: command <= 16'h0F4B; // COM6
-            8'h1C: command <= 16'h1602; //
+            8'h1A: command <= 16'h0E61; // COM5: 수직 동기화 설정
+            8'h1B: command <= 16'h0F4B; // COM6: 수직 동기화 설정
+            8'h1C: command <= 16'h1602; // 일반 설정
             8'h1D: command <= 16'h1E37; // MVFP: 미러/플립 설정
-            8'h1E: command <= 16'h2102; //
-            8'h1F: command <= 16'h2291; //
-            8'h20: command <= 16'h2907; //
-            8'h21: command <= 16'h330B; //
-            8'h22: command <= 16'h350B; //
-            8'h23: command <= 16'h371D; //
-            8'h24: command <= 16'h3871; //
-            8'h25: command <= 16'h392A; //
-            8'h26: command <= 16'h3C78; // COM12:
-            8'h27: command <= 16'h4D40; //
-            8'h28: command <= 16'h4E20; //
-            8'h29: command <= 16'h6900; // GFIX: 그린 채널 게인 고정
-            8'h2A: command <= 16'h6B4A; //
-            8'h2B: command <= 16'h7410; //
-            8'h2C: command <= 16'h8D4F; //
-            8'h2D: command <= 16'h8E00; //
-            8'h2E: command <= 16'h8F00; //
-            8'h2F: command <= 16'h9000; //
-            8'h30: command <= 16'h9100; //
-            8'h31: command <= 16'h9600; //
-            8'h32: command <= 16'h9A00; //
-            8'h33: command <= 16'hB084; //
-            8'h34: command <= 16'hB10C; //
-            8'h35: command <= 16'hB20E; //
-            8'h36: command <= 16'hB382; //
-            8'h37: command <= 16'hB80A; //
+            8'h1E: command <= 16'h2102; // 일반 설정
+            8'h1F: command <= 16'h2291; // 일반 설정
+            8'h20: command <= 16'h2907; // 일반 설정
+            8'h21: command <= 16'h330B; // 일반 설정
+            8'h22: command <= 16'h350B; // 일반 설정
+            8'h23: command <= 16'h371D; // 일반 설정
+            8'h24: command <= 16'h3871; // 일반 설정
+            8'h25: command <= 16'h392A; // 일반 설정
+            8'h26: command <= 16'h3C78; // COM12: 수직 동기화 설정
+            8'h27: command <= 16'h4D40; // 일반 설정
+            8'h28: command <= 16'h4E20; // 일반 설정
+            8'h29: command <= 16'h6900; // GFIX: 그린 게인 고정
+            8'h2A: command <= 16'h6B4A; // 일반 설정
+            8'h2B: command <= 16'h7410; // 일반 설정
+            8'h2C: command <= 16'h8D4F; // 일반 설정
+            8'h2D: command <= 16'h8E00; // 일반 설정
+            8'h2E: command <= 16'h8F00; // 일반 설정
+            8'h2F: command <= 16'h9000; // 일반 설정
+            8'h30: command <= 16'h9100; // 일반 설정
+            8'h31: command <= 16'h9600; // 일반 설정
+            8'h32: command <= 16'h9A00; // 일반 설정
+            8'h33: command <= 16'hB084; // 일반 설정
+            8'h34: command <= 16'hB10C; // 일반 설정
+            8'h35: command <= 16'hB20E; // 일반 설정
+            8'h36: command <= 16'hB382; // 일반 설정
+            8'h37: command <= 16'hB80A; // 일반 설정
             8'h38: command <= 16'h5640; // CONTRAS: 대비 설정
-            8'h39: command <= 16'h5500; // BRIGHT: 밝기 설정 (기본값 0x00)
+			8'h39: command <= 16'h5500; // BRIGHT: 밝기 설정 (기본값 0x00)
             default: command <= 16'hFFFF;  // 설정 완료 표시
         endcase
     end
