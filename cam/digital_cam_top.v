@@ -384,7 +384,7 @@ module digital_cam_top (
         .wraddress(wraddress_ram2),
         .wrclock(ov7670_pclk),
         .wren(wren_ram2),
-        .rdaddress(rdaddress_sync[15:0]),
+        .rdaddress(rdaddress_ram2[15:0]),
         .rdclock(clk_25_vga),
         .q(rddata_ram2)
     );
