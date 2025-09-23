@@ -1,6 +1,8 @@
 // OV7670 카메라 인터페이스 최상위 모듈
 // 카메라 캡처, 프레임 버퍼, VGA 디스플레이를 통합한 메인 모듈
 module digital_cam_top (
+    input  wire        btn_thr_up,     // Sobel 임계 증가 버튼 (액티브 로우)
+    input  wire        btn_thr_down,   // Sobel 임계 감소 버튼 (액티브 로우)
     input  wire        clk_50,         // 50MHz 시스템 클럭
     input  wire        btn_resend,     // 카메라 설정 재시작 버튼
     input  wire        sw_grayscale,   // SW[0] 그레이스케일 모드 스위치
@@ -71,6 +73,38 @@ module digital_cam_top (
     assign btn_rising_edge = btn_pressed & ~btn_pressed_prev;  // 상승 에지 감지
     assign resend = btn_rising_edge;  // 버튼 상승 에지에서 리셋 펄스 전송
 
+    // Sobel 임계 증가/감소 버튼 디바운싱 (액티브 로우, 20ms)
+    reg [19:0] up_cnt   = 20'd0;
+    reg [19:0] down_cnt = 20'd0;
+    reg up_stable   = 1'b0, up_prev   = 1'b0;
+    reg down_stable = 1'b0, down_prev = 1'b0;
+    wire up_pulse, down_pulse;
+    always @(posedge clk_50) begin
+        // UP
+        if (btn_thr_up == 1'b0) begin
+            if (up_cnt < 20'd1000000) up_cnt <= up_cnt + 1'b1; else up_stable <= 1'b1;
+        end else begin
+            up_cnt <= 20'd0; up_stable <= 1'b0;
+        end
+        up_prev <= up_stable;
+        // DOWN
+        if (btn_thr_down == 1'b0) begin
+            if (down_cnt < 20'd1000000) down_cnt <= down_cnt + 1'b1; else down_stable <= 1'b1;
+        end else begin
+            down_cnt <= 20'd0; down_stable <= 1'b0;
+        end
+        down_prev <= down_stable;
+    end
+    assign up_pulse   = up_stable & ~up_prev;
+    assign down_pulse = down_stable & ~down_prev;
+
+    // Sobel 임계값 (버튼 2/3로 증감)
+    reg  [7:0] sobel_threshold_btn = 8'd64; // 초기 64
+    always @(posedge clk_50) begin
+        if (up_pulse)   sobel_threshold_btn <= (sobel_threshold_btn >= 8'd250) ? 8'd255 : (sobel_threshold_btn + 8'd5);
+        if (down_pulse) sobel_threshold_btn <= (sobel_threshold_btn <= 8'd5)   ? 8'd0   : (sobel_threshold_btn - 8'd5);
+    end
+
     // 쓰기 주소 할당
     assign wraddress_ram1 = wraddress[15:0];  // RAM1: 0-32767 (16비트)
     wire [16:0] wraddr_sub = wraddress - 17'd32768;
@@ -81,8 +115,9 @@ module digital_cam_top (
     assign wren_ram2 = wren & wraddress[16];  // 주소 >= 32768일 때 RAM2에 쓰기
 
     // 읽기 주소 할당
-    assign rdaddress_ram1 = rdaddress[15:0];  // RAM1: 0-32767 (16비트)
-    wire [16:0] rdaddr_sub = rdaddress - 17'd32768;
+    // Read-side addresses must use the memory-aligned address (latency = MEM_RD_LAT)
+    assign rdaddress_ram1 = rdaddress_aligned[15:0];  // RAM1: 0-32767 (16비트)
+    wire [16:0] rdaddr_sub = rdaddress_aligned - 17'd32768;
     assign rdaddress_ram2 = rdaddr_sub[15:0];  // RAM2: 0-44031 (정상 오프셋)
 
     // 읽기 데이터 멀티플렉싱 - 상위 비트에 따라 어느 RAM에서 읽을지 결정
@@ -130,6 +165,31 @@ module digital_cam_top (
     wire        activeArea_aligned = activeArea_d2;     // 메모리 데이터(rddata)에 정렬된 active
     wire [16:0] rdaddress_aligned  = rdaddress_d2;      // 메모리 데이터(rddata)에 정렬된 주소
 
+    // Sobel 전용 x/y 카운터(정렬된 active 기준) -> {y[7:0], x[8:0]}
+    reg        active_aligned_prev = 1'b0;
+    reg        vsync_prev_aligned  = 1'b1;
+    reg [8:0]  sobel_x = 9'd0;     // 0..319
+    reg [7:0]  sobel_y = 8'd0;     // 0..239
+    always @(posedge clk_25_vga) begin
+        vsync_prev_aligned  <= vsync_raw;
+        active_aligned_prev <= activeArea_aligned;
+        // 프레임 시작에서 y 리셋 (VSYNC 상승 에지 기준)
+        if (!vsync_prev_aligned && vsync_raw) begin
+            sobel_y <= 8'd0;
+        end
+        // 라인 시작에서 x 리셋
+        if (activeArea_aligned && !active_aligned_prev) begin
+            sobel_x <= 9'd0;
+        end else if (activeArea_aligned) begin
+            if (sobel_x < 9'd319) sobel_x <= sobel_x + 1'b1;
+        end
+        // 라인 종료에서 y 증가
+        if (!activeArea_aligned && active_aligned_prev) begin
+            if (sobel_y < 8'd239) sobel_y <= sobel_y + 1'b1;
+        end
+    end
+    wire [16:0] sobel_addr_aligned = {sobel_y, sobel_x};
+
     // 그레이스케일 계산
     wire [16:0] gray_sum;
     assign gray_sum = (r_888 << 6) + (r_888 << 3) + (r_888 << 2) +
@@ -142,7 +202,8 @@ module digital_cam_top (
 
     // 파이프라인 지연: 경로별 상이
     // - 가우시안 2회: 4클럭, 소벨 추가: 2클럭 → 총 6클럭
-    localparam integer GAUSS_LAT = 4;
+    // Gaussian pipeline latency (per gaussian_3x3_gray8): 2 clocks
+    localparam integer GAUSS_LAT = 2;
     localparam integer SOBEL_EXTRA_LAT = 2;
     localparam integer PIPE_LATENCY = GAUSS_LAT + SOBEL_EXTRA_LAT; // 6
     reg [16:0] rdaddress_delayed [PIPE_LATENCY:0];      // rdaddress delayed value
@@ -255,9 +316,10 @@ module digital_cam_top (
         .clk(clk_25_vga),
         .enable(1'b1),
         .pixel_in(gray_blur),
-        .pixel_addr(rdaddress_aligned),
+        .pixel_addr(sobel_addr_aligned),
         .vsync(vsync_raw),
         .active_area(activeArea_aligned),
+        .threshold(sobel_threshold_btn),
         .pixel_out(sobel_value),
         .sobel_ready(sobel_ready)
     );
@@ -266,6 +328,9 @@ module digital_cam_top (
     wire canny_ready;
     reg  [7:0] canny_thr_low  = 8'd24;  // 기본 낮은 임계
     reg  [7:0] canny_thr_high = 8'd64;  // 기본 높은 임계
+    // Sobel 임계값 및 스위치 에지 기반 증감 제어
+    reg  [7:0] sobel_threshold = 8'd64; // 초기 64
+
     canny_3x3_gray8 canny_inst (
         .clk(clk_25_vga),
         .enable(filter_ready2),
@@ -289,7 +354,8 @@ module digital_cam_top (
     wire signed [9:0] g_blur  = {2'b00, gray_blur};
     wire signed [10:0] g_unsharp_w = g_gray + ((g_gray - g_blur) >>> 1);
     wire [7:0] unsharp_gray = g_unsharp_w[10] ? 8'd0 : (g_unsharp_w > 11'sd255 ? 8'd255 : g_unsharp_w[7:0]);
-    assign filtered_pixel = {unsharp_gray, unsharp_gray, unsharp_gray};
+    // For filter display, replicate 2-pass Gaussian output to RGB
+    assign filtered_pixel = {gray_blur2, gray_blur2, gray_blur2};
 
     // 스위치에 따른 출력 선택
     wire [7:0] final_r, final_g, final_b;
@@ -313,9 +379,14 @@ module digital_cam_top (
 
     wire [7:0] sel_gray   = activeArea_delayed[IDX_GRAY] ? gray_value_delayed[IDX_GRAY] : 8'h00;
 
-    wire [7:0] sel_gauss_r = (activeArea_delayed[IDX_GAUSS] && filter_ready_delayed[IDX_GAUSS]) ? filter_r_delayed[IDX_GAUSS] : 8'h00;
-    wire [7:0] sel_gauss_g = (activeArea_delayed[IDX_GAUSS] && filter_ready_delayed[IDX_GAUSS]) ? filter_g_delayed[IDX_GAUSS] : 8'h00;
-    wire [7:0] sel_gauss_b = (activeArea_delayed[IDX_GAUSS] && filter_ready_delayed[IDX_GAUSS]) ? filter_b_delayed[IDX_GAUSS] : 8'h00;
+    // 가우시안 경로: 경계에서는 그레이스케일 패스스루로 대체
+    wire        gauss_active = activeArea_delayed[IDX_GAUSS];
+    wire        gauss_ready  = filter_ready_delayed[IDX_GAUSS];
+    wire [7:0]  gauss_gray_fallback = gray_value_delayed[IDX_GAUSS];
+    // 경계/워밍업 구간(filter_ready=0)은 검정 출력
+    wire [7:0] sel_gauss_r = gauss_active ? (gauss_ready ? filter_r_delayed[IDX_GAUSS] : 8'h00) : 8'h00;
+    wire [7:0] sel_gauss_g = gauss_active ? (gauss_ready ? filter_g_delayed[IDX_GAUSS] : 8'h00) : 8'h00;
+    wire [7:0] sel_gauss_b = gauss_active ? (gauss_ready ? filter_b_delayed[IDX_GAUSS] : 8'h00) : 8'h00;
 
     wire [7:0] sel_sobel   = (activeArea_delayed[IDX_SOBEL] && sobel_ready_delayed[IDX_SOBEL]) ? sobel_value_delayed[IDX_SOBEL] : 8'h00;
     wire [7:0] sel_canny   = (activeArea_delayed[IDX_CANNY] && canny_ready_delayed[IDX_CANNY]) ? canny_value_delayed[IDX_CANNY] : 8'h00;
@@ -330,10 +401,32 @@ module digital_cam_top (
                      (sw_grayscale ? sel_gray :
                      (sw_filter ? sel_gauss_b : sel_orig_b)));
 
+    // 라인 시작 워밍업 게이트 (2클럭): 선택된 경로의 활성에 정렬
+    wire disp_active_sel = sw_canny    ? activeArea_delayed[IDX_CANNY] :
+                           (sw_sobel  ? activeArea_delayed[IDX_SOBEL] :
+                           (sw_grayscale ? activeArea_delayed[IDX_GRAY] :
+                           (sw_filter ? activeArea_delayed[IDX_GAUSS] : activeArea_delayed[IDX_ORIG])));
+    reg disp_active_prev = 1'b0;
+    reg [1:0] line_warmup = 2'd0;
+    always @(posedge clk_25_vga) begin
+        disp_active_prev <= disp_active_sel;
+        if (disp_active_sel && !disp_active_prev) begin
+            line_warmup <= 2'd0;
+        end else if (disp_active_sel) begin
+            if (line_warmup < 2'd2) line_warmup <= line_warmup + 1'b1;
+        end else begin
+            line_warmup <= 2'd0;
+        end
+    end
+    wire warm_ok = (line_warmup == 2'd2);
+    wire [7:0] out_r = warm_ok ? final_r : 8'h00;
+    wire [7:0] out_g = warm_ok ? final_g : 8'h00;
+    wire [7:0] out_b = warm_ok ? final_b : 8'h00;
+
     // VGA 출력 연결
-    assign vga_r = final_r;
-    assign vga_g = final_g;
-    assign vga_b = final_b;
+    assign vga_r = out_r;
+    assign vga_g = out_g;
+    assign vga_b = out_b;
 
     // PLL 인스턴스 - 클럭 생성
     my_altpll pll_inst (

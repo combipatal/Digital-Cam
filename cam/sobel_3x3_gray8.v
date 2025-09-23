@@ -9,6 +9,7 @@ module sobel_3x3_gray8 (
     input  wire [16:0] pixel_addr,   // {y[16:9], x[8:0]}
     input  wire        vsync,
     input  wire        active_area,
+    input  wire [7:0]  threshold,    // threshold for binary edge output
     output reg  [7:0]  pixel_out,
     output reg         sobel_ready
 );
@@ -18,6 +19,22 @@ module sobel_3x3_gray8 (
     // x/y 좌표 추출
     wire [8:0] x = pixel_addr[8:0];
     wire [8:0] y = pixel_addr[16:9];
+
+    // align coords and pixel_in to stage-2 latency (2 clocks)
+    reg [8:0] x_d1 = 9'd0, x_d2 = 9'd0;
+    reg [8:0] y_d1 = 9'd0, y_d2 = 9'd0;
+    reg [7:0] pix_d1 = 8'd0, pix_d2 = 8'd0;
+    always @(posedge clk) begin
+        if (enable && active_area) begin
+            x_d1 <= x;   x_d2 <= x_d1;
+            y_d1 <= y;   y_d2 <= y_d1;
+            pix_d1 <= pixel_in; pix_d2 <= pix_d1;
+        end else begin
+            x_d1 <= 9'd0; x_d2 <= 9'd0;
+            y_d1 <= 9'd0; y_d2 <= 9'd0;
+            pix_d1 <= 8'd0; pix_d2 <= 8'd0;
+        end
+    end
 
     // 프레임/라인 시작 검출
     reg vsync_prev  = 1'b0;
@@ -141,7 +158,16 @@ module sobel_3x3_gray8 (
             // stage 2: magnitude + clamp -> output
             mag <= {1'b0,gx_abs} + {1'b0,gy_abs};
             if (vpipe[PIPE_LAT-1]) begin
-                pixel_out <= (mag[11:8] != 4'b0000) ? 8'hFF : mag[7:0];
+                // border pass-through to avoid artificial edges on first 2 rows/cols
+                if ((x_d2 < 9'd2) || (y_d2 < 9'd2) || (x_d2 > 9'd317) || (y_d2 > 9'd237)) begin
+                    pixel_out <= pix_d2; // pass-through grayscale
+                end else begin
+                    // saturate to 8-bit then apply threshold -> binary edge map
+                    if ((mag[11:8] != 4'b0000 ? 8'hFF : mag[7:0]) >= threshold)
+                        pixel_out <= 8'hFF;
+                    else
+                        pixel_out <= 8'h00;
+                end
             end else begin
                 pixel_out <= 8'h00;
             end

@@ -1,156 +1,129 @@
-// 3x3 Gaussian blur for 8-bit grayscale (streaming, true 3x3 with 2 line buffers)
-module gaussian_3x3_gray8 (
+// 3x3 Gaussian blur for 8-bit grayscale (streaming)
+// - Uses two line buffers (image width deep) + 3-tap horizontal shift registers
+// - filter_ready is asserted only when a full 3x3 window is valid
+// - Designed for IMG_WIDTH = 320 by default (matches VGA active window)
+module gaussian_3x3_gray8 #(
+    parameter integer IMG_WIDTH = 320
+)(
     input  wire        clk,
     input  wire        enable,
     input  wire [7:0]  pixel_in,
-    input  wire [16:0] pixel_addr,   // {y[16:9], x[8:0]} with x:0..319, y:0..239
-    input  wire        vsync,
-    input  wire        active_area,
+    input  wire [16:0] pixel_addr,   // unused (kept for interface compatibility)
+    input  wire        vsync,        // active-low VSYNC from VGA controller
+    input  wire        active_area,  // 1 during active 320x240 window
     output reg  [7:0]  pixel_out,
     output reg         filter_ready
 );
 
-    // parameters: total pipeline latency (register stages) = 4
-    localparam integer PIPE_LAT = 4;
-
-    // x/y from address
-    wire [8:0] x = pixel_addr[8:0];
-    wire [8:0] y = pixel_addr[16:9];
-
-    // edge detection
-    reg vsync_prev  = 1'b0;
+    // Edge detectors
+    reg vsync_prev  = 1'b1;
     reg active_prev = 1'b0;
     always @(posedge clk) begin
         vsync_prev  <= vsync;
         active_prev <= active_area;
     end
-    wire frame_start = (vsync && !vsync_prev);
-    wire line_start  = (active_area && !active_prev);
 
-    // two line buffers (ping-pong): store y-1 and y-2
-    reg [7:0] lb0 [0:319];
-    reg [7:0] lb1 [0:319];
-    reg       wr_sel = 1'b0; // toggles each active line; selects buffer being written (holds y-2 before write)
+    wire vsync_fall  = vsync_prev & ~vsync;           // VSYNC goes low (frame start in this design)
+    wire active_rise = active_area & ~active_prev;     // start of active line
+    wire active_fall = ~active_area & active_prev;     // end of active line
 
-    // horizontal 3-tap shift registers for each of the three rows (y-2, y-1, y)
-    reg [7:0] top_sr0, top_sr1, top_sr2; // y-2: [x, x-1, x-2]
-    reg [7:0] mid_sr0, mid_sr1, mid_sr2; // y-1
-    reg [7:0] cur_sr0, cur_sr1, cur_sr2; // y
+    // Position within active window
+    reg [8:0] col = 9'd0;   // 0..IMG_WIDTH-1
+    reg [9:0] row = 10'd0;  // counts active lines, saturates
 
-    // 입력 유효: 경계는 내부에서 복제(clamp) 처리하므로 전체 활성 영역에서 유효
-    wire window_valid = enable && active_area;
+    // Two line buffers (previous two lines)
+    reg [7:0] line1 [0:IMG_WIDTH-1]; // line N-1
+    reg [7:0] line2 [0:IMG_WIDTH-1]; // line N-2
 
-    // tap inputs from line buffers (read-before-write for current x)
-    wire [7:0] top_in = (wr_sel == 1'b0) ? lb0[x] : lb1[x]; // y-2
-    wire [7:0] mid_in = (wr_sel == 1'b0) ? lb1[x] : lb0[x]; // y-1
+    // Horizontal 3-tap shift registers per line
+    reg [7:0] cur_0 = 8'd0, cur_1 = 8'd0, cur_2 = 8'd0;  // current line taps (x, x-1, x-2)
+    reg [7:0] l1_0  = 8'd0, l1_1  = 8'd0, l1_2  = 8'd0;  // line1 taps     (x, x-1, x-2)
+    reg [7:0] l2_0  = 8'd0, l2_1  = 8'd0, l2_2  = 8'd0;  // line2 taps     (x, x-1, x-2)
 
-    // shift/update per pixel
-    // (디버그 잔여 변수 제거)
+    // One-cycle pipeline for the weighted sum
+    reg [11:0] sum_blur = 12'd0; // max 16*255=4080
+
+    // Delay valid by one cycle to align with sum pipeline
+    reg active_d1 = 1'b0;
+    reg window_valid_d1 = 1'b0;
+    reg [7:0] pixel_in_d1 = 8'd0;   // pass-through source for border
+
+    // Read taps from line buffers at current column (combinational read of reg array)
+    wire [7:0] line1_tap = line1[col];
+    wire [7:0] line2_tap = line2[col];
+    // Border flag (top/left 2 pixels), delayed to stage-2
+    reg border_d1 = 1'b0;
+
+    // Stage-1: advance window and compute weighted sum
     always @(posedge clk) begin
-        if (frame_start) begin
-            wr_sel   <= 1'b0;
-            top_sr0  <= 8'd0; top_sr1 <= 8'd0; top_sr2 <= 8'd0;
-            mid_sr0  <= 8'd0; mid_sr1 <= 8'd0; mid_sr2 <= 8'd0;
-            cur_sr0  <= 8'd0; cur_sr1 <= 8'd0; cur_sr2 <= 8'd0;
-        end else begin
-            if (line_start) begin
-                // toggle write buffer and clear horizontal taps at the start of each active line
-                wr_sel  <= ~wr_sel;
-                top_sr0 <= 8'd0; top_sr1 <= 8'd0; top_sr2 <= 8'd0;
-                mid_sr0 <= 8'd0; mid_sr1 <= 8'd0; mid_sr2 <= 8'd0;
-                cur_sr0 <= 8'd0; cur_sr1 <= 8'd0; cur_sr2 <= 8'd0;
+        if (vsync_fall) begin
+            // start of frame: reset position and taps
+            col <= 9'd0;
+            row <= 10'd0;
+            {cur_0,cur_1,cur_2} <= 24'd0;
+            {l1_0,l1_1,l1_2}    <= 24'd0;
+            {l2_0,l2_1,l2_2}    <= 24'd0;
+            sum_blur <= 12'd0;
+            active_d1 <= 1'b0;
+            window_valid_d1 <= 1'b0;
+        end else if (enable) begin
+            if (active_rise) begin
+                // new active line: reset horizontal taps only
+                col <= 9'd0;
+                {cur_0,cur_1,cur_2} <= 24'd0;
+                {l1_0,l1_1,l1_2}    <= 24'd0;
+                {l2_0,l2_1,l2_2}    <= 24'd0;
+                sum_blur <= 12'd0;
+                // NOTE: row++ moved to active_fall
+            end else if (active_area) begin
+                // regular shift
+                cur_2 <= cur_1; cur_1 <= cur_0; cur_0 <= pixel_in;
+                l1_2  <= l1_1;  l1_1  <= l1_0;  l1_0  <= line1_tap;
+                l2_2  <= l2_1;  l2_1  <= l2_0;  l2_0  <= line2_tap;
+
+                sum_blur <= (cur_2 + cur_0 + l2_2 + l2_0)
+                        + ((cur_1 + l1_2 + l1_0 + l2_1) << 1)
+                        + (l1_1 << 2);
+
+                // update line buffers
+                line2[col] <= line1_tap;
+                line1[col] <= pixel_in;
+
+                if (col < IMG_WIDTH-1) col <= col + 1'b1;
+            end else if (active_fall) begin
+                // end of active line: now advance row
+                if (row < 10'd1023) row <= row + 1'b1;
             end
-            if (enable && active_area) begin
-                // shift horizontal windows
-                top_sr2 <= top_sr1;  top_sr1 <= top_sr0;  top_sr0 <= top_in;
-                mid_sr2 <= mid_sr1;  mid_sr1 <= mid_sr0;  mid_sr0 <= mid_in;
-                cur_sr2 <= cur_sr1;  cur_sr1 <= cur_sr0;  cur_sr0 <= pixel_in;
-                // write current pixel to the 'older' buffer (which currently holds y-2)
-                if (wr_sel == 1'b0) lb0[x] <= pixel_in; else lb1[x] <= pixel_in;
-            end
+
+            // pipeline-valid alignment
+            active_d1       <= active_area;
+            window_valid_d1 <= (row >= 10'd2) && (col >= 9'd2) && active_area;
+            pixel_in_d1     <= pixel_in;
+            border_d1       <= active_area && ((row < 10'd2) || (col < 9'd2));
         end
     end
 
-    // 다음 사이클에 적용될 시프트 결과를 조합으로 계산하여 "현재 픽셀"도 포함한 탭 구성
-    wire [7:0] n_top_sr0 = top_in;
-    wire [7:0] n_top_sr1 = top_sr0;
-    wire [7:0] n_top_sr2 = top_sr1;
-    wire [7:0] n_mid_sr0 = mid_in;
-    wire [7:0] n_mid_sr1 = mid_sr0;
-    wire [7:0] n_mid_sr2 = mid_sr1;
-    wire [7:0] n_cur_sr0 = pixel_in;
-    wire [7:0] n_cur_sr1 = cur_sr0;
-    wire [7:0] n_cur_sr2 = cur_sr1;
 
-    // 수평 클램프 적용된 탭 (x 경계 처리)
-    wire [7:0] top_x0 = n_top_sr0;
-    wire [7:0] top_x1 = (x == 9'd0) ? n_top_sr0 : n_top_sr1;
-    wire [7:0] top_x2 = (x == 9'd0) ? n_top_sr0 : ((x == 9'd1) ? n_top_sr1 : n_top_sr2);
-    wire [7:0] mid_x0 = n_mid_sr0;
-    wire [7:0] mid_x1 = (x == 9'd0) ? n_mid_sr0 : n_mid_sr1;
-    wire [7:0] mid_x2 = (x == 9'd0) ? n_mid_sr0 : ((x == 9'd1) ? n_mid_sr1 : n_mid_sr2);
-    wire [7:0] cur_x0 = n_cur_sr0;
-    wire [7:0] cur_x1 = (x == 9'd0) ? n_cur_sr0 : n_cur_sr1;
-    wire [7:0] cur_x2 = (x == 9'd0) ? n_cur_sr0 : ((x == 9'd1) ? n_cur_sr1 : n_cur_sr2);
-
-    // 수직 클램프 적용된 행 선택 (y 경계 처리)
-    wire [7:0] selT_x0 = (y == 9'd0) ? cur_x0 : ((y == 9'd1) ? mid_x0 : top_x0);
-    wire [7:0] selT_x1 = (y == 9'd0) ? cur_x1 : ((y == 9'd1) ? mid_x1 : top_x1);
-    wire [7:0] selT_x2 = (y == 9'd0) ? cur_x2 : ((y == 9'd1) ? mid_x2 : top_x2);
-    wire [7:0] selM_x0 = (y == 9'd0) ? cur_x0 : mid_x0;
-    wire [7:0] selM_x1 = (y == 9'd0) ? cur_x1 : mid_x1;
-    wire [7:0] selM_x2 = (y == 9'd0) ? cur_x2 : mid_x2;
-
-    // 최종 3x3 탭 매핑
-    wire [7:0] g00 = selT_x2; // (x-2, y-2)
-    wire [7:0] g01 = selT_x1; // (x-1, y-2)
-    wire [7:0] g02 = selT_x0; // (x  , y-2)
-    wire [7:0] g10 = selM_x2; // (x-2, y-1)
-    wire [7:0] g11 = selM_x1; // (x-1, y-1)
-    wire [7:0] g12 = selM_x0; // (x  , y-1)
-    wire [7:0] g20 = cur_x2;  // (x-2, y  )
-    wire [7:0] g21 = cur_x1;  // (x-1, y  )
-    wire [7:0] g22 = cur_x0;  // (x  , y  )
-
-    // 3x3 Gaussian kernel sum = (corners) + 2*(edges) + 4*(center)
-    wire [11:0] sum_corners = {4'b0, g00} + {4'b0, g02}
-                             + {4'b0, g20} + {4'b0, g22};
-    wire [11:0] sum_edges   = ({4'b0, g01} + {4'b0, g10}
-                             + {4'b0, g12} + {4'b0, g21}) << 1;
-    wire [11:0] sum_center  = {4'b0, g11} << 2;
-
-    // pipeline stages to match GAUSS_LAT=4 at top level
-    reg [11:0] p_sum1 = 12'd0;
-    reg [11:0] p_sum2 = 12'd0;
-    reg [7:0]  p_out3 = 8'd0;
-    reg [PIPE_LAT-1:0] vpipe = {PIPE_LAT{1'b0}};
-
+    // Stage-2: normalize and output
     always @(posedge clk) begin
-        if (frame_start) begin
-            p_sum1   <= 12'd0;
-            p_sum2   <= 12'd0;
-            p_out3   <= 8'd0;
-            vpipe    <= {PIPE_LAT{1'b0}};
-            pixel_out <= 8'd0;
-            filter_ready <= 1'b0;
-        end else begin
-            // valid pipeline
-            vpipe <= {vpipe[PIPE_LAT-2:0], window_valid};
-
-            // stage 1: weighted sum
-            if (window_valid) begin
-                p_sum1 <= sum_corners + sum_edges + sum_center;
+        if (enable && active_d1) begin
+            if (border_d1) begin
+                // top/left 2 pixels -> black, report not-ready so upstream can mask
+                pixel_out   <= 8'h00;
+                filter_ready <= 1'b0;
+            end else if (window_valid_d1) begin
+                // valid 3x3 window -> filtered output
+                pixel_out   <= sum_blur[11:4];
+                filter_ready <= 1'b1;
             end else begin
-                p_sum1 <= 12'd0;
+                pixel_out   <= 8'h00;
+                filter_ready <= 1'b0;
             end
-            // stage 2: register
-            p_sum2 <= p_sum1;
-            // stage 3: normalize (/16)
-            p_out3 <= p_sum2[11:4];
-            // stage 4: output + ready flag
-            pixel_out   <= vpipe[PIPE_LAT-1] ? p_out3 : 8'h00;
-            filter_ready <= vpipe[PIPE_LAT-1];
+        end else begin
+            pixel_out   <= 8'h00;
+            filter_ready <= 1'b0;
         end
     end
 
 endmodule
+

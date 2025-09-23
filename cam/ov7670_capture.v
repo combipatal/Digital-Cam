@@ -63,7 +63,7 @@ module ov7670_capture (
         // 카메라로부터 데이터 캡처 - RGB565 포맷
         if (latched_href == 1'b1) begin
             d_latch <= {d_latch[7:0], latched_d};  // 8비트씩 2번 받아서 16비트 완성
-        end
+        endc
         // 기본값: 쓰기 비활성
         we <= 1'b0;
         
