@@ -86,7 +86,8 @@ module digital_cam_top (
     assign rdaddress_ram2 = rdaddr_sub[15:0];  // RAM2: 0-44031 (정상 오프셋)
 
     // 읽기 데이터 멀티플렉싱 - 상위 비트에 따라 어느 RAM에서 읽을지 결정
-    assign rddata = rdaddress[16] ? rddata_ram2 : rddata_ram1;
+    // 메모리 출력(rddata)은 2클럭 뒤의 주소에 해당하므로, 선택 신호도 정렬된 주소를 사용
+    assign rddata = rdaddress_aligned[16] ? rddata_ram2 : rddata_ram1;
 
     // RGB 변환 및 그레이스케일, 소벨 필터, 디지털 필터 모드
     wire [7:0] gray_value;           // 그레이스케일 값
@@ -113,13 +114,28 @@ module digital_cam_top (
     // VGA 동기화 신호 원본 (사용 지점 이전에 선언)
     wire hsync_raw, vsync_raw;
     wire vga_blank_N_raw;
+    wire vga_sync_N_raw;
+
+    // 메모리(Read) 지연 보정: 듀얼포트 RAM B포트는 address_reg + outdata_reg로 2클럭 지연
+    localparam integer MEM_RD_LAT = 2;
+    // 활성영역/주소를 메모리 출력(lat=2)에 정렬
+    reg        activeArea_d1 = 1'b0, activeArea_d2 = 1'b0;
+    reg [16:0] rdaddress_d1 = 17'd0, rdaddress_d2 = 17'd0;
+    always @(posedge clk_25_vga) begin
+        activeArea_d1 <= activeArea;
+        activeArea_d2 <= activeArea_d1;
+        rdaddress_d1  <= rdaddress;
+        rdaddress_d2  <= rdaddress_d1;
+    end
+    wire        activeArea_aligned = activeArea_d2;     // 메모리 데이터(rddata)에 정렬된 active
+    wire [16:0] rdaddress_aligned  = rdaddress_d2;      // 메모리 데이터(rddata)에 정렬된 주소
 
     // 그레이스케일 계산
     wire [16:0] gray_sum;
     assign gray_sum = (r_888 << 6) + (r_888 << 3) + (r_888 << 2) +
                      (g_888 << 7) + (g_888 << 4) + (g_888 << 2) + (g_888 << 1) +
                      (b_888 << 4) + (b_888 << 3) + (b_888 << 1);
-    assign gray_value = activeArea ? gray_sum[16:8] : 8'h00;
+    assign gray_value = activeArea_aligned ? gray_sum[16:8] : 8'h00;
 
     // 필터 적용된 픽셀에서 RGB 분리
     wire [7:0] filter_r_888, filter_g_888, filter_b_888;
@@ -149,7 +165,7 @@ module digital_cam_top (
     // 파이프라인 정렬
     always @(posedge clk_25_vga) begin
         // 프레임 시작(Vsync 로우) 시 모든 지연 레지스터 클리어
-        if (vSync == 1'b0) begin
+        if (vsync_raw == 1'b0) begin
             for (i = 0; i <= PIPE_LATENCY; i = i + 1) begin
                 rdaddress_delayed[i] <= 17'd0;
                 activeArea_delayed[i] <= 1'b0;
@@ -169,8 +185,8 @@ module digital_cam_top (
             end
         end else begin
             // 0단계
-            rdaddress_delayed[0] <= rdaddress;
-            activeArea_delayed[0] <= activeArea;
+            rdaddress_delayed[0] <= rdaddress_aligned;
+            activeArea_delayed[0] <= activeArea_aligned;
             red_value_delayed[0] <= red_value;
             green_value_delayed[0] <= green_value;
             blue_value_delayed[0] <= blue_value;
@@ -208,15 +224,30 @@ module digital_cam_top (
 
     // 가우시안 블러 (그레이스케일 8비트)
     wire [7:0] gray_blur;
+    wire [7:0] gray_blur2;  // 2차 가우시안 결과
     gaussian_3x3_gray8 gaussian_gray_inst (
         .clk(clk_25_vga),
         .enable(1'b1),
         .pixel_in(gray_value),
-        .pixel_addr(rdaddress),
+        .pixel_addr(rdaddress_aligned),
         .vsync(vsync_raw),
-        .active_area(activeArea),
+        .active_area(activeArea_aligned),
         .pixel_out(gray_blur),
         .filter_ready(filter_ready)
+    );
+
+    // 2차 가우시안: 1차 결과를 다시 블러 처리
+    wire [16:0] rdaddress_gauss2 = rdaddress_delayed[GAUSS_LAT];
+    wire        activeArea_gauss2 = activeArea_delayed[GAUSS_LAT];
+    gaussian_3x3_gray8 gaussian_gray2_inst (
+        .clk(clk_25_vga),
+        .enable(1'b1),
+        .pixel_in(gray_blur),
+        .pixel_addr(rdaddress_gauss2),
+        .vsync(vsync_raw),
+        .active_area(activeArea_gauss2),
+        .pixel_out(gray_blur2),
+        .filter_ready(filter_ready2)
     );
 
     // 소벨 엣지 검출 (그레이스케일 8비트)
@@ -224,9 +255,9 @@ module digital_cam_top (
         .clk(clk_25_vga),
         .enable(1'b1),
         .pixel_in(gray_blur),
-        .pixel_addr(rdaddress),
+        .pixel_addr(rdaddress_aligned),
         .vsync(vsync_raw),
-        .active_area(activeArea),
+        .active_area(activeArea_aligned),
         .pixel_out(sobel_value),
         .sobel_ready(sobel_ready)
     );
@@ -239,9 +270,9 @@ module digital_cam_top (
         .clk(clk_25_vga),
         .enable(filter_ready2),
         .pixel_in(gray_blur2),
-        .pixel_addr(rdaddress),
+        .pixel_addr(rdaddress_gauss2),
         .vsync(vsync_raw),
-        .active_area(activeArea),
+        .active_area(activeArea_gauss2),
         .threshold_low(canny_thr_low),
         .threshold_high(canny_thr_high),
         .pixel_out(canny_value),
@@ -249,9 +280,9 @@ module digital_cam_top (
     );
     
     // 색상 값들 - RGB888 직접 사용
-    assign red_value = activeArea ? r_888 : 8'h00;
-    assign green_value = activeArea ? g_888 : 8'h00;
-    assign blue_value = activeArea ? b_888 : 8'h00;
+    assign red_value   = activeArea_aligned ? r_888 : 8'h00;
+    assign green_value = activeArea_aligned ? g_888 : 8'h00;
+    assign blue_value  = activeArea_aligned ? b_888 : 8'h00;
 
     // 그레이스케일 샤프닝(언샤프 마스크)
     wire signed [9:0] g_gray  = {2'b00, gray_value};
@@ -319,22 +350,29 @@ module digital_cam_top (
         .Hsync(hsync_raw), 
         .Vsync(vsync_raw),
         .Nblank(vga_blank_N_raw), 
-        .Nsync(vga_sync_N),
+        .Nsync(vga_sync_N_raw),
         .activeArea(activeArea), 
         .pixel_address(rdaddress)
     );
 
-    // Hsync/Vsync를 데이터 경로 지연과 일치시키기 위한 파이프라인 (6클럭 지연)
-    reg [5:0] hsync_delay_pipe = 6'b0;
-    reg [5:0] vsync_delay_pipe = 6'b0;
+    // VGA 동기화 신호들을 데이터 경로 지연과 일치시키기 위한 파이프라인
+    // 전체 데이터 지연 = 메모리 읽기 지연(2) + 파이프라인(6) = 8클럭
+    localparam integer SYNC_DELAY = PIPE_LATENCY + MEM_RD_LAT; // 8
+    reg [SYNC_DELAY-1:0] hsync_delay_pipe = {SYNC_DELAY{1'b0}};
+    reg [SYNC_DELAY-1:0] vsync_delay_pipe = {SYNC_DELAY{1'b0}};
+    reg [SYNC_DELAY-1:0] nblank_delay_pipe = {SYNC_DELAY{1'b0}};
+    reg [SYNC_DELAY-1:0] nsync_delay_pipe = {SYNC_DELAY{1'b0}};
     always @(posedge clk_25_vga) begin
-        hsync_delay_pipe <= {hsync_delay_pipe[4:0], hsync_raw};
-        vsync_delay_pipe <= {vsync_delay_pipe[4:0], vsync_raw};
+        hsync_delay_pipe  <= {hsync_delay_pipe[SYNC_DELAY-2:0], hsync_raw};
+        vsync_delay_pipe  <= {vsync_delay_pipe[SYNC_DELAY-2:0], vsync_raw};
+        nblank_delay_pipe <= {nblank_delay_pipe[SYNC_DELAY-2:0], vga_blank_N_raw};
+        nsync_delay_pipe  <= {nsync_delay_pipe[SYNC_DELAY-2:0], vga_sync_N_raw};
     end
 
-    assign vga_hsync = hsync_delay_pipe[5];
-    assign vga_vsync = vsync_delay_pipe[5];
-    assign vga_blank_N = vga_blank_N_raw;
+    assign vga_hsync   = hsync_delay_pipe[SYNC_DELAY-1];
+    assign vga_vsync   = vsync_delay_pipe[SYNC_DELAY-1];
+    assign vga_blank_N = nblank_delay_pipe[SYNC_DELAY-1];
+    assign vga_sync_N  = nsync_delay_pipe[SYNC_DELAY-1];
 
     // OV7670 카메라 컨트롤러
     ov7670_controller camera_ctrl (
@@ -351,10 +389,10 @@ module digital_cam_top (
 
     // OV7670 캡처 모듈
     ov7670_capture #(
-        .H_SKIP_LEFT(8),
-        .H_SKIP_RIGHT(8),
-        .V_SKIP_TOP(4),
-        .V_SKIP_BOTTOM(4)
+        .H_SKIP_LEFT(0),
+        .H_SKIP_RIGHT(0),
+        .V_SKIP_TOP(0),
+        .V_SKIP_BOTTOM(0)
     ) capture_inst (
         .pclk(ov7670_pclk),
         .vsync(ov7670_vsync),
@@ -365,16 +403,13 @@ module digital_cam_top (
         .we(wren)
     );
 
-    // 읽기 주소 동기화
-    wire [16:0] rdaddress_sync = rdaddress;
-
     // 듀얼 프레임 버퍼 RAM들
     frame_buffer_ram buffer_ram1 (
         .data(wrdata_ram1),
         .wraddress(wraddress_ram1),
         .wrclock(ov7670_pclk),
         .wren(wren_ram1),
-        .rdaddress(rdaddress_sync[15:0]),
+        .rdaddress(rdaddress_ram1[15:0]),
         .rdclock(clk_25_vga),
         .q(rddata_ram1)
     );
