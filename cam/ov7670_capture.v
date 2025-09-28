@@ -63,9 +63,9 @@ module ov7670_capture (
         // 카메라로부터 데이터 캡처 - RGB565 포맷
         if (latched_href == 1'b1) begin
             d_latch <= {d_latch[7:0], latched_d};  // 8비트씩 2번 받아서 16비트 완성
-        endc
+        end
         // 기본값: 쓰기 비활성
-        we <= 1'b0;
+        we = 1'b0;
         
         // 새 프레임 감지 - VSYNC가 활성화되면 프레임 시작(주소/상태 리셋)
         if (latched_vsync == 1'b1) begin
@@ -105,7 +105,7 @@ module ov7670_capture (
             end
         end
     end
-    
+
     // 입력 신호 래치 - 픽셀 클럭의 하강 에지에서 입력을 래치
     always @(negedge pclk) begin
         latched_d <= d;           // 픽셀 데이터 래치
