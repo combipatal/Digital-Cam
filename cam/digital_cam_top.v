@@ -480,13 +480,8 @@ module digital_cam_top (
         .xclk(ov7670_xclk)
     );
 
-    // OV7670 캡처 모듈
-    ov7670_capture #(
-        .H_SKIP_LEFT(0),
-        .H_SKIP_RIGHT(0),
-        .V_SKIP_TOP(0),
-        .V_SKIP_BOTTOM(0)
-    ) capture_inst (
+    // OV7670 캡처 모듈 (2x2 평균 디시메이션 포함)
+    ov7670_capture capture_inst (
         .pclk(ov7670_pclk),
         .vsync(ov7670_vsync),
         .href(ov7670_href),

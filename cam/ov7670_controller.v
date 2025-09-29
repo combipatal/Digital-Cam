@@ -201,7 +201,13 @@ module ov7670_registers (
             8'h37: command <= 16'hB80A; // 일반 설정
             8'h38: command <= 16'h5640; // CONTRAS: 대비 설정
 			8'h39: command <= 16'h5500; // BRIGHT: 밝기 설정 (기본값 0x00)
-            default: command <= 16'hFFFF;  // 설정 완료 표시
+			8'h3B: command <= 16'h3B0A; // COM11: 밴딩 필터 auto
+			8'h41: command <= 16'h4118; // COM16: de-noise auto + AWB gain enable
+			8'h4C: command <= 16'h4C14; // DNSTH: de-noise 기본 세기
+			8'h3F: command <= 16'h3F10; // EDGE: 약하게(필요시 0x00)
+			8'h76: command <= 16'h76C1; // REG76: 흑/백 픽셀 보정 enable
+			8'h77: command <= 16'h7710; // REG77: de-noise offset 기본
+			default: command <= 16'hFFFF;  // 설정 완료 표시
         endcase
     end
 endmodule

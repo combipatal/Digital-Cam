@@ -1,116 +1,172 @@
-// OV7670 캡처 모듈
-// 카메라로부터 픽셀 데이터를 캡처하여 블록 RAM에 저장
-module ov7670_capture (
-    input  wire        pclk,    // 픽셀 클럭 (카메라에서 제공)
-    input  wire        vsync,   // 수직 동기화 신호
-    input  wire        href,    // 수평 참조 신호 (라인 유효 신호)
-    input  wire [7:0]  d,       // 픽셀 데이터 (8비트)
-    output wire [16:0] addr,    // RAM 쓰기 주소
-    output wire [15:0] dout,    // RAM 쓰기 데이터 (RGB565 16비트)
-    output reg         we       // RAM 쓰기 활성화 신호
+// OV7670 capture with 2×2 average decimation (RGB565 -> RGB565).
+// - Assembles incoming RGB565 bytes from OV7670
+// - Performs 2x2 box filter (average) in sensor domain (640x480 -> 320x240)
+// - Writes decimated pixels directly to a linear BRAM (addr auto-increments)
+// I/O kept compatible with existing design.
+module ov7670_capture #(
+    parameter integer SRC_H           = 640,
+    parameter integer SRC_V           = 480,
+    parameter integer DST_H           = 320,
+    parameter integer DST_V           = 240,
+    parameter         HI_BYTE_FIRST   = 1,  // 1: [15:8] then [7:0]
+    parameter         BGR_ORDER       = 0   // 0: RGB565, 1: BGR565 output swap
+)(
+    input  wire        pclk,    // pixel clock from camera
+    input  wire        vsync,   // active-high frame sync (reset on rising)
+    input  wire        href,    // active-high line valid
+    input  wire [7:0]  d,       // pixel bus
+    output wire [16:0] addr,    // linear write address (0..(DST_H*DST_V-1))
+    output wire [15:0] dout,    // RGB565 write data
+    output reg         we       // write strobe (one pclk for each output pixel)
 );
 
-    // 크롭 파라미터 (필요 시 조정)
-    // 좌/우/상/하 테두리 픽셀을 버리고 블랙으로 채움
-    parameter integer H_SKIP_LEFT   = 0;  // 0..319
-    parameter integer H_SKIP_RIGHT  = 0;  // 0..319
-    parameter integer V_SKIP_TOP    = 0;  // 0..239
-    parameter integer V_SKIP_BOTTOM = 0;  // 0..239
-
-    // 내부 레지스터들
-    reg [15:0] d_latch = 16'h0000;        // 16비트 픽셀 데이터 래치 (RGB565)
-    reg [16:0] address = 17'h00000;       // RAM 쓰기 주소 (76800개 픽셀)
-    reg [8:0]  h_count = 9'd0;            // 라인 내 픽셀 인덱스 0..319
-    reg [8:0]  v_count = 9'd0;            // 프레임 내 라인 인덱스 0..239
-    reg [1:0]  line = 2'b00;              // 현재 라인 카운터 (0-3)
-    reg        href_hold = 1'b0;          // HREF 이전 상태
-    reg [6:0]  href_last = 7'b0000000;    // HREF 신호 히스토리 (7비트 시프트)
-    reg        latched_vsync = 1'b0;      // 래치된 VSYNC 신호
-    reg        latched_href = 1'b0;       // 래치된 HREF 신호
-    reg [7:0]  latched_d = 8'h00;         // 래치된 픽셀 데이터
-    
-    // 출력 신호 연결
-    assign addr = address;  // RAM 쓰기 주소
-    // 크롭 범위 밖은 블랙으로 기록하기 위한 선택 신호
-    reg write_black = 1'b0;
-    assign dout = write_black ? 16'h0000 : d_latch;  // 범위 밖은 블랙
-    
+    // -------- Sync edge detection --------
+    reg vsync_d, href_d;
     always @(posedge pclk) begin
-        // 주소는 (v*320 + h)로 직접 계산하여 기록 시에만 갱신
-        if (we == 1'b1) begin
-            // 320 = 256 + 64
-            address <= ({8'd0, v_count} << 8) + ({8'd0, v_count} << 6) + {8'd0, h_count};
-        end
-        
-        // HREF 상승 에지 감지 - 새로운 스캔 라인 시작
-        if (href_hold == 1'b0 && latched_href == 1'b1) begin
-            h_count <= 9'd0;              // 가로 인덱스 리셋
-            case (line)
-                2'b00: line <= 2'b01;  // 라인 0 -> 1
-                2'b01: line <= 2'b10;  // 라인 1 -> 2
-                2'b10: line <= 2'b11;  // 라인 2 -> 3
-                default: line <= 2'b00;  // 라인 3 -> 0 (순환)
-            endcase
-        end
-        // HREF 하강 에지 감지 - 라인 종료 시 세로 인덱스 증가 (다운샘플 라인에 대해서만)
-        if (href_hold == 1'b1 && latched_href == 1'b0) begin
-            if (line[1] == 1'b1) begin
-                if (v_count < 9'd239) v_count <= v_count + 1'b1;
-            end
-        end
-        href_hold <= latched_href;  // HREF 이전 상태 저장
-        
-        // 카메라로부터 데이터 캡처 - RGB565 포맷
-        if (latched_href == 1'b1) begin
-            d_latch <= {d_latch[7:0], latched_d};  // 8비트씩 2번 받아서 16비트 완성
-        end
-        // 기본값: 쓰기 비활성
-        we = 1'b0;
-        
-        // 새 프레임 감지 - VSYNC가 활성화되면 프레임 시작(주소/상태 리셋)
-        if (latched_vsync == 1'b1) begin
-            address <= 17'h00000;      // 주소를 처음으로 리셋
-            href_last <= 7'b0000000;   // HREF 히스토리 리셋
-            line <= 2'b00;             // 라인 카운터 리셋
-            h_count <= 9'd0;           // 가로 인덱스 리셋
-            v_count <= 9'd0;           // 세로 인덱스 리셋
-            we <= 1'b0;                // 프레임 경계에서는 쓰기 비활성
-        end else begin
-            // 쓰기 활성화 제어 - 320x240 해상도를 위해 2줄마다 캡처
-            if (href_last[2] == 1'b1) begin  // HREF가 3클럭 동안 활성화되었을 때 (수평 다운샘플 트리거)
-                if (line[1] == 1'b1 && h_count < 9'd320 && v_count < 9'd240) begin   // 다운샘플 라인 & 범위 내
-                    // 주소는 (v*320 + h)
-                    address <= ({8'd0, v_count} << 8) + ({8'd0, v_count} << 6) + {8'd0, h_count};
-                    // 크롭 범위 계산
-                    // 허용 수평: [H_SKIP_LEFT .. 319-H_SKIP_RIGHT]
-                    // 허용 수직: [V_SKIP_TOP  .. 239-V_SKIP_BOTTOM]
-                    if ((h_count >= H_SKIP_LEFT[8:0]) && (h_count <= (9'd319 - H_SKIP_RIGHT[8:0])) &&
-                        (v_count >= V_SKIP_TOP[8:0])  && (v_count <= (9'd239 - V_SKIP_BOTTOM[8:0]))) begin
-                        write_black <= 1'b0;  // 유효 범위: 원본 픽셀 기록
-                    end else begin
-                        write_black <= 1'b1;  // 범위 밖: 블랙 기록
-                    end
-                    we <= 1'b1;              // RAM 쓰기 1사이클
-                    // 다음 픽셀로 진행
-                    if (h_count < 9'd319) begin
-                        h_count <= h_count + 1'b1;
-                    end
-                end else begin
-                    we <= 1'b0;              // 범위 밖이면 억제
-                    write_black <= 1'b0;
-                end
-                href_last <= 7'b0000000;     // HREF 히스토리 리셋
-            end else begin
-                href_last <= {href_last[5:0], latched_href};  // HREF 히스토리 시프트
-            end
-        end
+        vsync_d <= vsync;
+        href_d  <= href;
     end
+    wire vsync_rise = (vsync && !vsync_d);
+    wire href_rise  = (href  && !href_d);
+    wire href_fall  = (!href &&  href_d);
 
-    // 입력 신호 래치 - 픽셀 클럭의 하강 에지에서 입력을 래치
-    always @(negedge pclk) begin
-        latched_d <= d;           // 픽셀 데이터 래치
-        latched_href <= href;     // HREF 신호 래치
-        latched_vsync <= vsync;   // VSYNC 신호 래치
+    // -------- Byte assembly (RGB565) --------
+    reg        byte_phase;        // 0: first byte, 1: second byte
+    reg [7:0]  first_byte;
+    reg [15:0] pix16;
+    reg        pix_valid;
+
+    // -------- Pixel coordinate tracking (source) --------
+    reg [9:0]  src_x;             // 0..639 within current source line
+    reg        line_parity;       // 0: even line of 2x2, 1: odd line of 2x2
+    reg [8:0]  decim_x;           // 0..319 index for decimated x
+
+    // -------- Horizontal 2-pixel sum per color (current & previous line) --------
+    // Pack = {R_sum2[5:0], G_sum2[6:0], B_sum2[5:0]} = 19 bits
+    reg [18:0] hpair_sum_prev [0:DST_H-1];
+
+    // Working regs
+    reg [4:0] r5, r5_p0, b5, b5_p0, r_avg5, b_avg5;
+    reg [5:0] g6, g6_p0, g_avg6;
+    reg [5:0] r_sum2, b_sum2, r_prev2, b_prev2;   // 0..62
+    reg [6:0] g_sum2, g_prev2;                    // 0..126
+    reg [6:0] r_sum4, b_sum4;                     // 0..124
+    reg [7:0] g_sum4;                             // 0..252
+    reg [18:0] prev_pack;
+    reg [15:0] out_pix;
+
+    // -------- Address generator (linear, auto-increment) --------
+    reg [16:0] wr_addr;
+    assign addr = wr_addr;
+    assign dout = out_pix;
+
+    // -------- Reset/Start of frame --------
+    always @(posedge pclk) begin
+        if (vsync_rise) begin
+            // Reset frame state
+            byte_phase  <= 1'b0;
+            pix_valid   <= 1'b0;
+            src_x       <= 10'd0;
+            line_parity <= 1'b0;
+            decim_x     <= 9'd0;
+            we          <= 1'b0;
+            wr_addr     <= 17'd0;
+        end else begin
+            we <= 1'b0; // default
+
+            // HREF gating
+            if (href_rise) begin
+                byte_phase  <= 1'b0;
+                pix_valid   <= 1'b0;
+                src_x       <= 10'd0;
+                decim_x     <= 9'd0;
+            end
+
+            // Assemble bytes into RGB565 pixel
+            if (href) begin
+                if (!byte_phase) begin
+                    first_byte <= d;
+                    byte_phase <= 1'b1;
+                    pix_valid  <= 1'b0;
+                end else begin
+                    // Second byte -> pixel complete this cycle
+                    byte_phase <= 1'b0;
+                    pix_valid  <= 1'b1;
+                    if (HI_BYTE_FIRST)
+                        pix16 <= {first_byte, d};
+                    else
+                        pix16 <= {d, first_byte};
+                end
+            end else begin
+                byte_phase <= 1'b0;
+                pix_valid  <= 1'b0;
+            end
+
+            // On each completed source pixel, advance src_x and perform 2x2 accumulate
+            if (pix_valid) begin
+                // Unpack RGB565 to components
+                // pix16[15:11]=R5, [10:5]=G6, [4:0]=B5 (for RGB order)
+                r5 = pix16[15:11];
+                g6 = pix16[10:5];
+                b5 = pix16[4:0];
+
+                // Horizontal pair logic: combine two pixels per 2x block
+                if (src_x[0] == 1'b0) begin
+                    // even column: remember current as P0
+                    r5_p0 <= r5;
+                    g6_p0 <= g6;
+                    b5_p0 <= b5;
+                end else begin
+                    // odd column: accumulate current with P0 => 2-pixel sums
+                    r_sum2 = r5_p0 + r5;  // 6-bit
+                    g_sum2 = g6_p0 + g6;  // 7-bit
+                    b_sum2 = b5_p0 + b5;  // 6-bit
+
+                    // Store or output depending on line parity
+                    if (line_parity == 1'b0) begin
+                        // Even source line: store horizontal sums, no output
+                        hpair_sum_prev[decim_x] <= {r_sum2, g_sum2, b_sum2};
+                    end else begin
+                        // Odd source line: fetch previous sums and produce averaged pixel
+                        prev_pack = hpair_sum_prev[decim_x];
+                        r_prev2   = prev_pack[18:13];
+                        g_prev2   = prev_pack[12:6];
+                        b_prev2   = prev_pack[5:0];
+
+                        r_sum4 = r_prev2 + r_sum2; // 7b
+                        g_sum4 = g_prev2 + g_sum2; // 8b
+                        b_sum4 = b_prev2 + b_sum2; // 7b
+
+                        // Divide by 4 (>>2) to get average, keep RGB565 widths
+                        r_avg5 = r_sum4[6:2];
+                        g_avg6 = g_sum4[7:2];
+                        b_avg5 = b_sum4[6:2];
+
+                        // Repack (optionally swap RB)
+                        if (!BGR_ORDER)
+                            out_pix <= {r_avg5, g_avg6, b_avg5};
+                        else
+                            out_pix <= {b_avg5, g_avg6, r_avg5};
+
+                        // Emit one averaged pixel
+                        we      <= 1'b1;
+                        wr_addr <= wr_addr + 17'd1;
+                    end
+
+                    // Advance 2-pixel column index at each odd column
+                    if (decim_x != DST_H-1)
+                        decim_x <= decim_x + 9'd1;
+                end
+
+                // Advance source x each completed pixel
+                if (src_x != SRC_H-1)
+                    src_x <= src_x + 10'd1;
+            end
+
+            // At end of line, toggle parity
+            if (href_fall) begin
+                line_parity <= ~line_parity;
+            end
+        end
     end
-    
 endmodule
