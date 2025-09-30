@@ -44,6 +44,33 @@ module digital_cam_top (
     wire [15:0] rddata;     // RAM 읽기 데이터 (RGB565)
     wire activeArea;        // VGA 활성 영역
 
+    // 캡처 초기 지연 로직 - 첫 프레임 완료 후 VGA 활성화
+    reg first_frame_captured = 1'b0;  // 첫 프레임 캡처 완료 플래그 (pclk 도메인)
+    reg vsync_prev_pclk = 1'b0;       // vsync 이전 값 (pclk 도메인)
+    
+    // 첫 프레임 완료 감지 (캡처 클럭 도메인)
+    always @(posedge ov7670_pclk) begin
+        vsync_prev_pclk <= ov7670_vsync;
+        // vsync 하강 에지 = 프레임 완료
+        if (vsync_prev_pclk && !ov7670_vsync && !first_frame_captured) begin
+            first_frame_captured <= 1'b1;
+        end
+        // 리셋 시 초기화
+        if (resend) begin
+            first_frame_captured <= 1'b0;
+        end
+    end
+    
+    // CDC (Clock Domain Crossing) 동기화: pclk → clk_25_vga
+    reg frame_ready_sync1 = 1'b0;
+    reg frame_ready_sync2 = 1'b0;
+    always @(posedge clk_25_vga) begin
+        frame_ready_sync1 <= first_frame_captured;
+        frame_ready_sync2 <= frame_ready_sync1;  // 2단 동기화
+    end
+    
+    wire vga_enable = frame_ready_sync2;  // VGA 출력 활성화 신호
+
     // 듀얼 프레임 버퍼 신호들 (320x240 = 76800 픽셀을 두 개의 RAM으로 분할)
     wire [15:0] wraddress_ram1, rdaddress_ram1; // RAM1: 16비트 주소 (0-32767)
     wire [15:0] wraddress_ram2, rdaddress_ram2; // RAM2: 16비트 주소 (0-44031)
@@ -401,10 +428,10 @@ module digital_cam_top (
                      (sw_grayscale ? sel_gray :
                      (sw_filter ? sel_gauss_b : sel_orig_b)));
 
-    // VGA 출력 연결 
-    assign vga_r = final_r;
-    assign vga_g = final_g;
-    assign vga_b = final_b;
+    // VGA 출력 연결 (첫 프레임 캡처 완료 후 활성화)
+    assign vga_r = vga_enable ? final_r : 8'h00;  // 준비 안되면 검정 출력
+    assign vga_g = vga_enable ? final_g : 8'h00;
+    assign vga_b = vga_enable ? final_b : 8'h00;
 
     // PLL 인스턴스 - 클럭 생성
     my_altpll pll_inst (
