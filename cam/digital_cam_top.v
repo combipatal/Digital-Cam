@@ -69,7 +69,7 @@ module digital_cam_top (
         frame_ready_sync2 <= frame_ready_sync1;  // 2단 동기화
     end
     
-    wire vga_enable = frame_ready_sync2;  // VGA 출력 활성화 신호
+    wire vga_enable;  // VGA 출력 활성화 신호
 
     // 듀얼 프레임 버퍼 신호들 (320x240 = 76800 픽셀을 두 개의 RAM으로 분할)
     wire [15:0] wraddress_ram1, rdaddress_ram1; // RAM1: 16비트 주소 (0-32767)
@@ -178,15 +178,31 @@ module digital_cam_top (
     wire vga_blank_N_raw;
     wire vga_sync_N_raw;
 
+    // 프레임 경계에서 VGA 출력 활성화 (vsync 상승 에지 이후)
+    reg vga_enable_reg = 1'b0;
+    reg vsync_prev_display = 1'b1;
+    always @(posedge clk_25_vga) begin
+        vsync_prev_display <= vsync_raw;
+        if (!frame_ready_sync2) begin
+            vga_enable_reg <= 1'b0;
+        end else if (!vsync_prev_display && vsync_raw) begin
+            vga_enable_reg <= 1'b1;
+        end
+    end
+    assign vga_enable = vga_enable_reg;
+
     // 메모리(Read) 지연 보정: 듀얼포트 RAM B포트는 address_reg + outdata_reg로 2클럭 지연
     localparam integer MEM_RD_LAT = 2;
     // 활성영역/주소를 메모리 출력(lat=2)에 정렬
     reg        activeArea_d1 = 1'b0, activeArea_d2 = 1'b0;
     reg [16:0] rdaddress_d1 = 17'd0, rdaddress_d2 = 17'd0;
+    // 라인 시작 1클럭 프리카운트: active 상승 직후 첫 픽셀에서 주소를 1 앞당겨 메모리 요청
+    wire       active_rise = activeArea && !activeArea_d1;
+    wire [16:0] rdaddress_pre = (active_rise && (rdaddress != 17'd0)) ? (rdaddress - 17'd1) : rdaddress;
     always @(posedge clk_25_vga) begin
         activeArea_d1 <= activeArea;
         activeArea_d2 <= activeArea_d1;
-        rdaddress_d1  <= rdaddress;
+        rdaddress_d1  <= rdaddress_pre;
         rdaddress_d2  <= rdaddress_d1;
     end
     wire        activeArea_aligned = activeArea_d2;     // 메모리 데이터(rddata)에 정렬된 active
@@ -428,10 +444,27 @@ module digital_cam_top (
                      (sw_grayscale ? sel_gray :
                      (sw_filter ? sel_gauss_b : sel_orig_b)));
 
-    // VGA 출력 연결 (첫 프레임 캡처 완료 후 활성화)
-    assign vga_r = vga_enable ? final_r : 8'h00;  // 준비 안되면 검정 출력
-    assign vga_g = vga_enable ? final_g : 8'h00;
-    assign vga_b = vga_enable ? final_b : 8'h00;
+    // 라인 시작 데이터 파이프라인 워밍업 마스크
+    // 각 라인 시작(active 상승)에서 데이터 경로 지연(TOTAL_DATA_LAT)만큼 출력 마스킹
+    localparam integer TOTAL_DATA_LAT = PIPE_LATENCY + MEM_RD_LAT; // 6 + 2 = 8
+    reg [TOTAL_DATA_LAT-1:0] line_valid_pipe = {TOTAL_DATA_LAT{1'b0}};
+    always @(posedge clk_25_vga) begin
+        if (!vga_enable) begin
+            line_valid_pipe <= {TOTAL_DATA_LAT{1'b0}}; // 출력 비활성 시 워밍업 리셋
+        end else if (activeArea_aligned && !active_aligned_prev) begin
+            line_valid_pipe <= {TOTAL_DATA_LAT{1'b0}}; // 라인 시작 시 클리어
+        end else if (activeArea_aligned) begin
+            line_valid_pipe <= {line_valid_pipe[TOTAL_DATA_LAT-2:0], 1'b1};
+        end else begin
+            line_valid_pipe <= {TOTAL_DATA_LAT{1'b0}}; // 비활성 구간은 0 유지
+        end
+    end
+    wire line_warm_ok = line_valid_pipe[TOTAL_DATA_LAT-1];
+
+    // VGA 출력 연결 (첫 프레임 캡처 완료 후 + 라인 워밍업 이후 활성화)
+    assign vga_r = (vga_enable && line_warm_ok) ? final_r : 8'h00;  // 준비 안되면 검정 출력
+    assign vga_g = (vga_enable && line_warm_ok) ? final_g : 8'h00;
+    assign vga_b = (vga_enable && line_warm_ok) ? final_b : 8'h00;
 
     // PLL 인스턴스 - 클럭 생성
     my_altpll pll_inst (
@@ -454,8 +487,8 @@ module digital_cam_top (
     );
 
     // VGA 동기화 신호들을 데이터 경로 지연과 일치시키기 위한 파이프라인
-    // 전체 데이터 지연 = 메모리 읽기 지연(2) + 파이프라인(6) = 8클럭
-    localparam integer SYNC_DELAY = PIPE_LATENCY + MEM_RD_LAT; // 8
+    // 전체 데이터 지연 = 메모리 읽기 지연(2) + 파이프라인(6) + 보정(1+추가3) = 12클럭
+    localparam integer SYNC_DELAY = PIPE_LATENCY + MEM_RD_LAT + 4; // 12
     reg [SYNC_DELAY-1:0] hsync_delay_pipe = {SYNC_DELAY{1'b0}};
     reg [SYNC_DELAY-1:0] vsync_delay_pipe = {SYNC_DELAY{1'b0}};
     reg [SYNC_DELAY-1:0] nblank_delay_pipe = {SYNC_DELAY{1'b0}};
@@ -518,3 +551,4 @@ module digital_cam_top (
     );
 
 endmodule
+
