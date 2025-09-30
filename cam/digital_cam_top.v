@@ -205,7 +205,7 @@ module digital_cam_top (
     // Gaussian pipeline latency (per gaussian_3x3_gray8): 2 clocks
     localparam integer GAUSS_LAT = 2;
     localparam integer SOBEL_EXTRA_LAT = 2;
-    localparam integer PIPE_LATENCY = GAUSS_LAT + SOBEL_EXTRA_LAT; // 6
+    localparam integer PIPE_LATENCY = GAUSS_LAT * 2 + SOBEL_EXTRA_LAT; // 6
     reg [16:0] rdaddress_delayed [PIPE_LATENCY:0];      // rdaddress delayed value
     reg activeArea_delayed [PIPE_LATENCY:0];            // active area delayed value
     reg [7:0] red_value_delayed [PIPE_LATENCY:0];       // red delayed value
@@ -315,7 +315,7 @@ module digital_cam_top (
     sobel_3x3_gray8 sobel_inst (
         .clk(clk_25_vga),
         .enable(1'b1),
-        .pixel_in(gray_blur),
+        .pixel_in(gray_blur2),
         .pixel_addr(sobel_addr_aligned),
         .vsync(vsync_raw),
         .active_area(activeArea_aligned),
@@ -368,8 +368,8 @@ module digital_cam_top (
     // 경로별 지연 인덱스
     localparam integer IDX_ORIG  = PIPE_LATENCY;    // 최종 경로 정렬 인덱스 (6)
     localparam integer IDX_GRAY  = PIPE_LATENCY;    // 최종 경로 정렬 인덱스 (6)
-    localparam integer IDX_GAUSS = PIPE_LATENCY - GAUSS_LAT;        // 가우시안 출력 정렬 인덱스 (2)
-    localparam integer IDX_SOBEL = 0;                              // 소벨 전용 경로(즉시 출력 경로용) 인덱스
+    localparam integer IDX_GAUSS = PIPE_LATENCY - GAUSS_LAT;        // 가우시안 출력 정렬 인덱스 (4)
+    localparam integer IDX_SOBEL = PIPE_LATENCY;    // 소벨은 2차 가우시안 후 처리되므로 전체 파이프라인 지연 (6)
     localparam integer IDX_CANNY = PIPE_LATENCY;    // 캐니는 전체 파이프라인(6클럭) 후에 유효
 
     // 최종 출력 선택(경로별 인덱스 및 ready 게이팅)
@@ -401,32 +401,10 @@ module digital_cam_top (
                      (sw_grayscale ? sel_gray :
                      (sw_filter ? sel_gauss_b : sel_orig_b)));
 
-    // 라인 시작 워밍업 게이트 (2클럭): 선택된 경로의 활성에 정렬
-    wire disp_active_sel = sw_canny    ? activeArea_delayed[IDX_CANNY] :
-                           (sw_sobel  ? activeArea_delayed[IDX_SOBEL] :
-                           (sw_grayscale ? activeArea_delayed[IDX_GRAY] :
-                           (sw_filter ? activeArea_delayed[IDX_GAUSS] : activeArea_delayed[IDX_ORIG])));
-    reg disp_active_prev = 1'b0;
-    reg [1:0] line_warmup = 2'd0;
-    always @(posedge clk_25_vga) begin
-        disp_active_prev <= disp_active_sel;
-        if (disp_active_sel && !disp_active_prev) begin
-            line_warmup <= 2'd0;
-        end else if (disp_active_sel) begin
-            if (line_warmup < 2'd2) line_warmup <= line_warmup + 1'b1;
-        end else begin
-            line_warmup <= 2'd0;
-        end
-    end
-    wire warm_ok = (line_warmup == 2'd2);
-    wire [7:0] out_r = warm_ok ? final_r : 8'h00;
-    wire [7:0] out_g = warm_ok ? final_g : 8'h00;
-    wire [7:0] out_b = warm_ok ? final_b : 8'h00;
-
-    // VGA 출력 연결
-    assign vga_r = out_r;
-    assign vga_g = out_g;
-    assign vga_b = out_b;
+    // VGA 출력 연결 
+    assign vga_r = final_r;
+    assign vga_g = final_g;
+    assign vga_b = final_b;
 
     // PLL 인스턴스 - 클럭 생성
     my_altpll pll_inst (
