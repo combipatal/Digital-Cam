@@ -55,7 +55,7 @@ module sobel_3x3_gray8 (
     reg [7:0] mid_sr0, mid_sr1, mid_sr2; // y-1
     reg [7:0] cur_sr0, cur_sr1, cur_sr2; // y
 
-    // 내부 유효 신호 (경계 복제이므로 활성영역이면 유효)
+    // 내부 유효 신호 (상위 필터에서 이미 유효한 데이터만 받음)
     wire window_valid = enable && active_area;
 
     // 현재 x에서 라인버퍼 읽기 (쓰기 전에 읽음)
@@ -96,23 +96,23 @@ module sobel_3x3_gray8 (
     wire [7:0] n_cur_sr1 = cur_sr0;
     wire [7:0] n_cur_sr2 = cur_sr1;
 
-    // 수평/수직 경계 복제(clamp)
+    // 수평/수직 경계 복제(clamp) - 0으로 패딩하여 인위적 경계 방지
     wire [7:0] top_x0 = n_top_sr0;
-    wire [7:0] top_x1 = (x == 9'd0) ? n_top_sr0 : n_top_sr1;
-    wire [7:0] top_x2 = (x == 9'd0) ? n_top_sr0 : ((x == 9'd1) ? n_top_sr1 : n_top_sr2);
+    wire [7:0] top_x1 = (x == 9'd0) ? 8'd0 : n_top_sr1;
+    wire [7:0] top_x2 = (x == 9'd0) ? 8'd0 : ((x == 9'd1) ? 8'd0 : n_top_sr2);
     wire [7:0] mid_x0 = n_mid_sr0;
-    wire [7:0] mid_x1 = (x == 9'd0) ? n_mid_sr0 : n_mid_sr1;
-    wire [7:0] mid_x2 = (x == 9'd0) ? n_mid_sr0 : ((x == 9'd1) ? n_mid_sr1 : n_mid_sr2);
+    wire [7:0] mid_x1 = (x == 9'd0) ? 8'd0 : n_mid_sr1;
+    wire [7:0] mid_x2 = (x == 9'd0) ? 8'd0 : ((x == 9'd1) ? 8'd0 : n_mid_sr2);
     wire [7:0] cur_x0 = n_cur_sr0;
-    wire [7:0] cur_x1 = (x == 9'd0) ? n_cur_sr0 : n_cur_sr1;
-    wire [7:0] cur_x2 = (x == 9'd0) ? n_cur_sr0 : ((x == 9'd1) ? n_cur_sr1 : n_cur_sr2);
+    wire [7:0] cur_x1 = (x == 9'd0) ? 8'd0 : n_cur_sr1;
+    wire [7:0] cur_x2 = (x == 9'd0) ? 8'd0 : ((x == 9'd1) ? 8'd0 : n_cur_sr2);
 
-    wire [7:0] selT_x0 = (y == 9'd0) ? cur_x0 : ((y == 9'd1) ? mid_x0 : top_x0);
-    wire [7:0] selT_x1 = (y == 9'd0) ? cur_x1 : ((y == 9'd1) ? mid_x1 : top_x1);
-    wire [7:0] selT_x2 = (y == 9'd0) ? cur_x2 : ((y == 9'd1) ? mid_x2 : top_x2);
-    wire [7:0] selM_x0 = (y == 9'd0) ? cur_x0 : mid_x0;
-    wire [7:0] selM_x1 = (y == 9'd0) ? cur_x1 : mid_x1;
-    wire [7:0] selM_x2 = (y == 9'd0) ? cur_x2 : mid_x2;
+    wire [7:0] selT_x0 = (y == 9'd0) ? 8'd0 : ((y == 9'd1) ? 8'd0 : top_x0);
+    wire [7:0] selT_x1 = (y == 9'd0) ? 8'd0 : ((y == 9'd1) ? 8'd0 : top_x1);
+    wire [7:0] selT_x2 = (y == 9'd0) ? 8'd0 : ((y == 9'd1) ? 8'd0 : top_x2);
+    wire [7:0] selM_x0 = (y == 9'd0) ? 8'd0 : mid_x0;
+    wire [7:0] selM_x1 = (y == 9'd0) ? 8'd0 : mid_x1;
+    wire [7:0] selM_x2 = (y == 9'd0) ? 8'd0 : mid_x2;
 
     // 최종 3x3 탭
     wire [7:0] g00 = selT_x2; // (x-2, y-2)
@@ -158,19 +158,16 @@ module sobel_3x3_gray8 (
             // stage 2: magnitude + clamp -> output
             mag <= {1'b0,gx_abs} + {1'b0,gy_abs};
             if (vpipe[PIPE_LAT-1]) begin
-                // border pass-through to avoid artificial edges on first 2 rows/cols
-                if ((x_d2 < 9'd2) || (y_d2 < 9'd2) || (x_d2 > 9'd317) || (y_d2 > 9'd237)) begin
-                    pixel_out <= pix_d2; // pass-through grayscale
-                end else begin
-                    // saturate to 8-bit then apply threshold -> binary edge map
-                    if ((mag[11:8] != 4'b0000 ? 8'hFF : mag[7:0]) >= threshold)
-                        pixel_out <= 8'hFF;
-                    else
-                        pixel_out <= 8'h00;
-                end
+                // 상위 가우시안 필터에서 이미 유효한 데이터만 받으므로 경계 처리 불필요
+                // saturate to 8-bit then apply threshold -> binary edge map
+                if ((mag[11:8] != 4'b0000 ? 8'hFF : mag[7:0]) >= threshold)
+                    pixel_out <= 8'hFF;
+                else
+                    pixel_out <= 8'h00;
             end else begin
                 pixel_out <= 8'h00;
             end
+            // 상위 가우시안 필터에서 이미 유효한 데이터만 받으므로 sobel_ready는 파이프라인 지연만 고려
             sobel_ready <= vpipe[PIPE_LAT-1];
         end
     end

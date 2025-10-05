@@ -172,7 +172,7 @@ module ov7670_registers (
             8'h1A: command <= 16'h0E61; // COM5: 수직 동기화 설정
             8'h1B: command <= 16'h0F4B; // COM6: 수직 동기화 설정
             8'h1C: command <= 16'h1602; // 일반 설정
-            8'h1D: command <= 16'h1E37; // MVFP: 미러/플립 설정
+            8'h1D: command <= 16'h1E77; // MVFP: 미러/플립 설정 (좌우반전)
             8'h1E: command <= 16'h2102; // 일반 설정
             8'h1F: command <= 16'h2291; // 일반 설정
             8'h20: command <= 16'h2907; // 일반 설정
