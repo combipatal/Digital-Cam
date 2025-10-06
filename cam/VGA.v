@@ -1,4 +1,8 @@
 // VGA 컨트롤러 - 640x480 @ 60Hz, 25MHz 픽셀 클럭
+// [개선 사항]
+// 1. PREFETCH 값 2 → 8로 증가 (SDRAM + FIFO 지연 보상)
+// 2. 주소 생성 로직 안정화
+
 module VGA (
     input  wire CLK25,         // 25MHz 픽셀 클럭 입력
     input  wire [15:0] pixel_data, // 현재 픽셀 데이터 (미사용)
@@ -34,9 +38,15 @@ module VGA (
     localparam [9:0] H_ACTIVE_END   = 10'd480;
     localparam [9:0] V_ACTIVE_START = 10'd120;
     localparam [9:0] V_ACTIVE_END   = 10'd360;
-    localparam integer PREFETCH = 2;  // 메모리 읽기 지연 (RAM 2클럭)
-    localparam [9:0] H_READ_START = H_ACTIVE_START - PREFETCH; // 158
-    localparam [9:0] H_READ_END   = H_ACTIVE_END   - PREFETCH; // 478
+    
+    // *** PREFETCH 증가: 2 → 8 ***
+    // SDRAM latency (6-8 clocks @ 100MHz) + FIFO delay (4-5) + CDC (2-3)
+    // = 약 12-16 클럭 (100MHz) ≈ 3-4 클럭 (25MHz)
+    // 안전 마진 포함하여 8 클럭 프리페치
+    localparam integer PREFETCH = 8;
+    
+    localparam [9:0] H_READ_START = H_ACTIVE_START - PREFETCH; // 152
+    localparam [9:0] H_READ_END   = H_ACTIVE_END   - PREFETCH; // 472
 
     wire in_active_v  = (Vcnt >= V_ACTIVE_START) && (Vcnt < V_ACTIVE_END);
     wire read_window  = in_active_v &&
@@ -60,7 +70,7 @@ module VGA (
             Hcnt <= Hcnt + 1'b1;
         end
         
-        // 프리페치 구간에서 주소 증가 (유효 라인보다 8클럭 앞서 요청)
+        // 프리페치 구간에서 주소 증가
         if (read_window) begin
             if (pixel_addr < 17'd76799) begin
                 pixel_addr <= pixel_addr + 1'b1;
