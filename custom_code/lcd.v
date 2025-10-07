@@ -63,6 +63,10 @@ module lcd(
    reg [19:0] delay_target_count;
 	
 	reg new_data;	// 새로운 데이터 판단
+   reg [5:0] en_pulse_count; // EN 펄스 길이 카운터
+   reg [7:0]data_count;
+	reg [7:0]pre_data;
+   reg [7:0]current_input;
    
     // ===================================================================
     // 파라미터 정의
@@ -72,22 +76,27 @@ module lcd(
    // 논리회로 상태  
    parameter IDLE = 4'b0000;                // 대기 상태
    parameter INIT_START = 4'b0001;          // 초기화 시작 
-   parameter INIT_FUN_SET = 4'b0010;        // 기능 설정
-   parameter INIT_DISPLAY_ON = 4'b0011;     // 화면 켜기
-   parameter INIT_CLEAR = 4'b0100;          // 화면 지우기
-   parameter INIT_ENTRY_MODE = 4'b0101;     // 입력 모드 설정
+   parameter INIT_FUN_SET1 = 4'b0010;       // 기능 설정 1차
+   parameter INIT_FUN_SET2 = 4'b0011;       // 기능 설정 2차
+   parameter INIT_FUN_SET3 = 4'b0100;       // 기능 설정 3차
+   parameter INIT_DISPLAY_ON = 4'b0101;     // 화면 켜기
+   parameter INIT_CLEAR = 4'b0110;          // 화면 지우기
+   parameter INIT_ENTRY_MODE = 4'b0111;     // 입력 모드 설정
     
-   parameter WRITE_POS = 4'b0110;           // 문자쓰기 위치지정
-   parameter WRITE_DATA = 4'b0111;          // 문자쓰기 문자지정
+   parameter WRITE_POS = 4'b1000;           // 문자쓰기 위치지정
+   parameter WRITE_DATA = 4'b1001;          // 문자쓰기 문자지정
+   parameter DATA_WAIT = 4'b1010;           // 데이터 변경 대기
    // 조합회로 상태
-   parameter CMD_WRITE = 4'b1000;           // 명령어/데이터를 버스에 쓰는 상태 
-   parameter EN_PULSE = 4'b1001;            // Enable 신호 pulse 발생
-   parameter DELAY_WAIT =4'b1010;           // 지연 대기 상태
+   parameter CMD_WRITE = 4'b1011;           // 명령어/데이터를 버스에 쓰는 상태 
+   parameter EN_PULSE = 4'b1100;            // Enable 신호 pulse 발생
+   parameter DELAY_WAIT =4'b1101;           // 지연 대기 상태
       
    // 50MHz 기준 delay 값 
    parameter delay_15ms = 20'd750000;       // 전원 켜진 후 초기 대기시간
-   parameter delay_40us = 20'd2000;         // 
-   parameter delay_2ms =  20'd100000;
+   parameter delay_5ms = 20'd250000;        // 5ms delay (초기화용)
+   parameter delay_100us = 20'd5000;        // 100us delay (초기화용)
+   parameter delay_40us = 20'd2000;         // 40us delay
+   parameter delay_2ms =  20'd100000;       // 2ms delay
   
   // 조합 회로 FSM 상태 변경 
   always @(*) begin 
@@ -99,13 +108,23 @@ module lcd(
               next_state = INIT_START;
            end
         end
+        
+        // INIT_START는 delay만 하는 상태
+        INIT_START : begin
+            next_state = DELAY_WAIT;
+        end
+        
         // 명령어/데이터를 버스에 설정하고 EN_PULSE 상태로 이동
         CMD_WRITE : begin 
             next_state = EN_PULSE;                  
         end
         
         EN_PULSE : begin
-            next_state = DELAY_WAIT;
+            if(en_pulse_count >= 5'd25) begin  // EN을 약 500ns 유지
+                next_state = DELAY_WAIT;
+            end else begin
+                next_state = EN_PULSE;
+            end
         end
           
         DELAY_WAIT : begin 
@@ -115,26 +134,38 @@ module lcd(
                 next_state = DELAY_WAIT;
             end
         end
+        
+        DATA_WAIT : begin
+            // 데이터가 변경되면 WRITE_POS로 이동
+            if(pre_data != current_input) begin
+                next_state = WRITE_POS;
+            end else begin
+                next_state = DATA_WAIT;  // 데이터 변경 대기
+            end
+        end
+        
         // 초기화 및 문자 쓰기 상태들은 CMD_WRITE 상태로 이동하여 실제 전송 수행
         default : begin 
             next_state = CMD_WRITE;
         end
        endcase
    end
-   reg [7:0]data_count;
-	reg [7:0]pre_data;
    
   always @(posedge clk or negedge rst_n) begin 
         if (!rst_n) begin 
             state <= IDLE;
             lcd_rs <= 1'b0;
             lcd_en<= 1'b0;
-            lcd_data <= 1'b0;
+            lcd_data <= 8'h20;  // 공백 문자로 초기화
             delay_target_count <= 20'b0;
-				data_count = 0;
-				pre_data <= 0;
+				data_count <= 0;
+				pre_data <= 8'hFF;  // 초기값을 다르게 설정
+            en_pulse_count <= 0;
+            current_input <= 8'h41;  // 'A' 문자로 초기화 (테스트용)
         end else begin
             
+            // 입력 데이터를 매 클럭 샘플링
+            current_input <= input_data;
 
             state <= next_state;
 				
@@ -142,6 +173,12 @@ module lcd(
                 delay_count <= delay_count + 1;
             end else begin
                 delay_count <= 20'b0;
+            end
+            
+            if(state == EN_PULSE) begin
+                en_pulse_count <= en_pulse_count + 1;
+            end else begin
+                en_pulse_count <= 0;
             end
             
             // 각 상태 에 따른 출력 정의 
@@ -152,22 +189,35 @@ module lcd(
                 
                 INIT_START : begin 
                     delay_target_count <= delay_15ms;
-                    return_state <= INIT_FUN_SET;
+                    return_state <= INIT_FUN_SET1;
                 end
                 
-                INIT_FUN_SET : begin
+                INIT_FUN_SET1 : begin
                     lcd_rs <= 1'b0;
-                    lcd_data <= 8'h38;                      // commnad data
-                    delay_target_count <= delay_40us;       // delay time
-                    return_state <= INIT_DISPLAY_ON;               // after delay count, next_state
-                    //state <= delay_state;                   // next_state
+                    lcd_data <= 8'h38;                      // 8bit, 2line, 5x8 font
+                    delay_target_count <= delay_5ms;        // 5ms delay
+                    return_state <= INIT_FUN_SET2;
+                end
+                
+                INIT_FUN_SET2 : begin
+                    lcd_rs <= 1'b0;
+                    lcd_data <= 8'h38;                      // 8bit, 2line, 5x8 font (2차)
+                    delay_target_count <= delay_100us;      // 100us delay
+                    return_state <= INIT_FUN_SET3;
+                end
+                
+                INIT_FUN_SET3 : begin
+                    lcd_rs <= 1'b0;
+                    lcd_data <= 8'h38;                      // 8bit, 2line, 5x8 font (3차)
+                    delay_target_count <= delay_100us;      // 100us delay
+                    return_state <= INIT_DISPLAY_ON;
                 end
                 
                 INIT_DISPLAY_ON :begin
                     lcd_rs <= 1'b0;
-                    lcd_data <= 8'h0c;
-                    delay_target_count <= delay_40us;           // dalay time
-                    return_state <= INIT_CLEAR;               // delay_state 후 next_state
+                    lcd_data <= 8'h0c;                      // Display ON, Cursor OFF, Blink OFF
+                    delay_target_count <= delay_40us;
+                    return_state <= INIT_CLEAR;
                 end
                             
                 INIT_CLEAR : begin
@@ -180,7 +230,7 @@ module lcd(
                 INIT_ENTRY_MODE : begin
                     lcd_rs <= 1'b0;
                     lcd_data <= 8'h06;
-                    delay_target_count <= delay_2ms;
+                    delay_target_count <= delay_40us;
                     return_state <= WRITE_POS;
                 end
                 // 커서 위치 지정
@@ -193,12 +243,16 @@ module lcd(
                 
                 WRITE_DATA : begin
 					 	lcd_rs <= 1'b1;
-						if (pre_data != input_data) begin 
-							lcd_data <= input_data;          // 출력 데이터
-							pre_data <= input_data;
-							delay_target_count <= delay_40us;
-							return_state <= WRITE_POS;
-						end
+						lcd_data <= current_input;       // 출력 데이터
+						pre_data <= current_input;
+						delay_target_count <= delay_40us;
+						return_state <= DATA_WAIT;       // 데이터 쓴 후 대기 상태로
+                end
+                
+                DATA_WAIT : begin
+                    // 데이터 대기 상태 - lcd_en을 LOW로 유지
+                    lcd_en <= 1'b0;
+                    lcd_rs <= 1'b1;  // 데이터 모드 유지
                 end
                 
                 CMD_WRITE : begin 

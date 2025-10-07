@@ -55,6 +55,7 @@ always @(posedge clk or negedge rst_n) begin
         case (state)
             
             IDLE        : begin
+                bit_counter <= 0;
                 if(pre_data_save[1] && !pre_data_save[0]) begin
                     count <= 0;
                     state <= LEAD_MARK;
@@ -111,7 +112,7 @@ always @(posedge clk or negedge rst_n) begin
                     // 32bit check
                     if( bit_counter == 5'd31) begin
                         state <= PROCESS_DATA;
-								count <= 0 ;
+                        bit_counter <= 0;
                     end else begin
                         count <= 0;
                         state <= DATA_MARK;
@@ -127,9 +128,9 @@ always @(posedge clk or negedge rst_n) begin
                 received_data [15:8] <= save_data [23:16];  // data
                 received_data [7:0] <= save_data [31:24];   // inv_data
 
-                if ( (received_data [31:16] == MY_CUSTOM_CODE) &&
-                    (received_data[15:8]== ~received_data[7:0]) ) begin
-                    captured_code <= received_data [15:8];
+                if ( (save_data [15:0] == MY_CUSTOM_CODE) &&
+                    (save_data[23:16]== ~save_data[31:24]) ) begin
+                    captured_code <= save_data [23:16];
 						  //data_valid <= 1;
                 end
                 state <= IDLE;
