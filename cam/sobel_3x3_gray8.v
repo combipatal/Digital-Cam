@@ -20,8 +20,13 @@ module sobel_3x3_gray8 #(
     localparam integer PIPE_LAT = 5; // Sobel internal pipeline latency
 
     // Extract coordinates from active_area (independent of pixel_addr)
-    reg [8:0] x_coord = 9'd0;
-    reg [8:0] y_coord = 9'd0;
+    localparam integer COL_BITS = (IMG_WIDTH  <= 256) ? 8 :
+                                  (IMG_WIDTH  <= 512) ? 9 : 10;
+    localparam integer ROW_BITS = (IMG_HEIGHT <= 256) ? 8 :
+                                  (IMG_HEIGHT <= 512) ? 9 : 10;
+
+    reg [COL_BITS-1:0] x_coord = {COL_BITS{1'b0}};
+    reg [ROW_BITS-1:0] y_coord = {ROW_BITS{1'b0}};
 
     // Frame/line boundary detection
     reg vsync_prev  = 1'b0;
@@ -39,11 +44,11 @@ module sobel_3x3_gray8 #(
     // Coordinate counting
     always @(posedge clk) begin
         if (frame_start) begin
-            x_coord <= 9'd0;
-            y_coord <= 9'd0;
+            x_coord <= {COL_BITS{1'b0}};
+            y_coord <= {ROW_BITS{1'b0}};
         end else if (enable) begin
             if (active_rise) begin
-                x_coord <= 9'd0;
+                x_coord <= {COL_BITS{1'b0}};
             end else if (active_area) begin
                 if (x_coord < IMG_WIDTH-1)
                     x_coord <= x_coord + 1'b1;
@@ -54,14 +59,16 @@ module sobel_3x3_gray8 #(
             end
         end
     end
-    wire [8:0] x_curr = line_start ? 9'd0 :
-                        (active_area ? ((x_coord == IMG_WIDTH-1) ? x_coord : (x_coord + 1'b1)) : x_coord);
-    wire [8:0] x = x_curr;
-    wire [8:0] y = y_coord;
+    wire [COL_BITS-1:0] x_curr = line_start ? {COL_BITS{1'b0}} :
+                                 (active_area ? ((x_coord == IMG_WIDTH-1) ? x_coord : (x_coord + 1'b1)) : x_coord);
+    wire [COL_BITS-1:0] x = x_curr;
+    wire [ROW_BITS-1:0] y = y_coord;
 
     // Align coordinates and pixel data to Sobel pipeline latency
-    reg [8:0] x_d1 = 9'd0, x_d2 = 9'd0, x_d3 = 9'd0, x_d4 = 9'd0, x_d5 = 9'd0;
-    reg [8:0] y_d1 = 9'd0, y_d2 = 9'd0, y_d3 = 9'd0, y_d4 = 9'd0, y_d5 = 9'd0;
+    reg [COL_BITS-1:0] x_d1 = {COL_BITS{1'b0}}, x_d2 = {COL_BITS{1'b0}},
+                         x_d3 = {COL_BITS{1'b0}}, x_d4 = {COL_BITS{1'b0}}, x_d5 = {COL_BITS{1'b0}};
+    reg [ROW_BITS-1:0] y_d1 = {ROW_BITS{1'b0}}, y_d2 = {ROW_BITS{1'b0}},
+                         y_d3 = {ROW_BITS{1'b0}}, y_d4 = {ROW_BITS{1'b0}}, y_d5 = {ROW_BITS{1'b0}};
     reg [7:0] pix_d1 = 8'd0, pix_d2 = 8'd0, pix_d3 = 8'd0, pix_d4 = 8'd0, pix_d5 = 8'd0;
     always @(posedge clk) begin
         if (enable && active_area) begin
@@ -69,15 +76,17 @@ module sobel_3x3_gray8 #(
             y_d1 <= y;   y_d2 <= y_d1;   y_d3 <= y_d2;   y_d4 <= y_d3;   y_d5 <= y_d4;
             pix_d1 <= pixel_in; pix_d2 <= pix_d1; pix_d3 <= pix_d2; pix_d4 <= pix_d3; pix_d5 <= pix_d4;
         end else begin
-            x_d1 <= 9'd0; x_d2 <= 9'd0; x_d3 <= 9'd0; x_d4 <= 9'd0; x_d5 <= 9'd0;
-            y_d1 <= 9'd0; y_d2 <= 9'd0; y_d3 <= 9'd0; y_d4 <= 9'd0; y_d5 <= 9'd0;
+            x_d1 <= {COL_BITS{1'b0}}; x_d2 <= {COL_BITS{1'b0}}; x_d3 <= {COL_BITS{1'b0}};
+            x_d4 <= {COL_BITS{1'b0}}; x_d5 <= {COL_BITS{1'b0}};
+            y_d1 <= {ROW_BITS{1'b0}}; y_d2 <= {ROW_BITS{1'b0}}; y_d3 <= {ROW_BITS{1'b0}};
+            y_d4 <= {ROW_BITS{1'b0}}; y_d5 <= {ROW_BITS{1'b0}};
             pix_d1 <= 8'd0; pix_d2 <= 8'd0; pix_d3 <= 8'd0; pix_d4 <= 8'd0; pix_d5 <= 8'd0;
         end
     end
 
     // Two line buffers (ping-pong) + horizontal 3-tap shift registers
-    reg [7:0] lb0 [0:319];
-    reg [7:0] lb1 [0:319];
+    reg [7:0] lb0 [0:IMG_WIDTH-1];
+    reg [7:0] lb1 [0:IMG_WIDTH-1];
     reg       wr_sel = 1'b0; // toggles at each line start
 
     reg [7:0] top_sr0, top_sr1, top_sr2; // y-2
@@ -126,25 +135,25 @@ module sobel_3x3_gray8 #(
     wire [7:0] n_cur_sr2 = cur_sr1;
 
     // Top/left 2 pixels are treated as border pixels and output black
-    wire border_pixel = (x_d5 < 9'd2) || (y_d5 < 9'd2);
+    wire border_pixel = (x_d5 < 2) || (y_d5 < 2);
 
     // Boundary clamping: form complete 3x3 window from image boundaries
     wire [7:0] top_x0 = n_top_sr0;
-    wire [7:0] top_x1 = (x == 9'd0) ? n_top_sr0 : n_top_sr1;
-    wire [7:0] top_x2 = (x == 9'd0) ? n_top_sr0 : ((x == 9'd1) ? n_top_sr1 : n_top_sr2);
+    wire [7:0] top_x1 = (x == 0) ? n_top_sr0 : n_top_sr1;
+    wire [7:0] top_x2 = (x == 0) ? n_top_sr0 : ((x == 1) ? n_top_sr1 : n_top_sr2);
     wire [7:0] mid_x0 = n_mid_sr0;
-    wire [7:0] mid_x1 = (x == 9'd0) ? n_mid_sr0 : n_mid_sr1;
-    wire [7:0] mid_x2 = (x == 9'd0) ? n_mid_sr0 : ((x == 9'd1) ? n_mid_sr1 : n_mid_sr2);
+    wire [7:0] mid_x1 = (x == 0) ? n_mid_sr0 : n_mid_sr1;
+    wire [7:0] mid_x2 = (x == 0) ? n_mid_sr0 : ((x == 1) ? n_mid_sr1 : n_mid_sr2);
     wire [7:0] cur_x0 = n_cur_sr0;
-    wire [7:0] cur_x1 = (x == 9'd0) ? n_cur_sr0 : n_cur_sr1;
-    wire [7:0] cur_x2 = (x == 9'd0) ? n_cur_sr0 : ((x == 9'd1) ? n_cur_sr1 : n_cur_sr2);
+    wire [7:0] cur_x1 = (x == 0) ? n_cur_sr0 : n_cur_sr1;
+    wire [7:0] cur_x2 = (x == 0) ? n_cur_sr0 : ((x == 1) ? n_cur_sr1 : n_cur_sr2);
 
-    wire [7:0] selT_x0 = (y == 9'd0) ? cur_x0 : ((y == 9'd1) ? mid_x0 : top_x0);
-    wire [7:0] selT_x1 = (y == 9'd0) ? cur_x1 : ((y == 9'd1) ? mid_x1 : top_x1);
-    wire [7:0] selT_x2 = (y == 9'd0) ? cur_x2 : ((y == 9'd1) ? mid_x2 : top_x2);
-    wire [7:0] selM_x0 = (y == 9'd0) ? cur_x0 : mid_x0;
-    wire [7:0] selM_x1 = (y == 9'd0) ? cur_x1 : mid_x1;
-    wire [7:0] selM_x2 = (y == 9'd0) ? cur_x2 : mid_x2;
+    wire [7:0] selT_x0 = (y == 0) ? cur_x0 : ((y == 1) ? mid_x0 : top_x0);
+    wire [7:0] selT_x1 = (y == 0) ? cur_x1 : ((y == 1) ? mid_x1 : top_x1);
+    wire [7:0] selT_x2 = (y == 0) ? cur_x2 : ((y == 1) ? mid_x2 : top_x2);
+    wire [7:0] selM_x0 = (y == 0) ? cur_x0 : mid_x0;
+    wire [7:0] selM_x1 = (y == 0) ? cur_x1 : mid_x1;
+    wire [7:0] selM_x2 = (y == 0) ? cur_x2 : mid_x2;
 
     // Final 3x3 pixel window
     wire [7:0] g00 = selT_x2; // (x-2, y-2)

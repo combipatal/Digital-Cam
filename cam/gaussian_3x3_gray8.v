@@ -28,7 +28,10 @@ module gaussian_3x3_gray8 #(
     wire active_fall = ~active_area & active_prev;     // end of active line
 
     // Position within active window
-    reg [8:0] col = 9'd0;   // 0..IMG_WIDTH-1
+    localparam integer COL_BITS = (IMG_WIDTH <= 256) ? 8 :
+                                   (IMG_WIDTH <= 512) ? 9 : 10;
+
+    reg [COL_BITS-1:0] col = {COL_BITS{1'b0}};   // 0..IMG_WIDTH-1
     reg [9:0] row = 10'd0;  // counts active lines, saturates
 
     // Two line buffers (previous two lines)
@@ -58,7 +61,7 @@ module gaussian_3x3_gray8 #(
     always @(posedge clk) begin
         if (vsync_fall) begin
             // start of frame: reset position and taps
-            col <= 9'd0;
+            col <= {COL_BITS{1'b0}};
             row <= 10'd0;
             {cur_0,cur_1,cur_2} <= 24'd0;
             {l1_0,l1_1,l1_2}    <= 24'd0;
@@ -69,7 +72,7 @@ module gaussian_3x3_gray8 #(
         end else if (enable) begin
             if (active_rise) begin
                 // new active line: reset horizontal taps only
-                col <= 9'd0;
+                col <= {COL_BITS{1'b0}};
                 {cur_0,cur_1,cur_2} <= 24'd0;
                 {l1_0,l1_1,l1_2}    <= 24'd0;
                 {l2_0,l2_1,l2_2}    <= 24'd0;
@@ -97,9 +100,9 @@ module gaussian_3x3_gray8 #(
 
             // pipeline-valid alignment
             active_d1       <= active_area;
-            window_valid_d1 <= (row >= 10'd2) && (col >= 9'd2) && active_area;
+            window_valid_d1 <= (row >= 10'd2) && (col >= 2) && active_area;
             pixel_in_d1     <= pixel_in;
-            border_d1       <= active_area && ((row < 10'd2) || (col < 9'd2));
+            border_d1       <= active_area && ((row < 10'd2) || (col < 2));
         end
     end
 
