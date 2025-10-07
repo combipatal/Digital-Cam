@@ -355,7 +355,9 @@ module digital_cam_top (
     wire activeArea_320 = activeArea_aligned && stretch_d2;
 
     wire [7:0] gray_blur;
-    gaussian_3x3_gray8 gaussian_gray_inst (
+    gaussian_3x3_gray8 #(
+        .IMG_WIDTH(640)
+    ) gaussian_gray_inst (
         .clk(clk_25_vga),
         .enable(1'b1),
         .pixel_in(gray_value),
@@ -371,7 +373,10 @@ module digital_cam_top (
     // 소벨 엣지 검출 (1차 가우시안 지연에 맞춘 타이밍)
     wire [16:0] rdaddress_gauss = rdaddress_delayed[GAUSS_LAT];
     wire activeArea_gauss = activeArea_delayed[GAUSS_LAT];
-    sobel_3x3_gray8 sobel_inst (
+    sobel_3x3_gray8 #(
+        .IMG_WIDTH(640),
+        .IMG_HEIGHT(480)
+    ) sobel_inst (
         .clk(clk_25_vga),
         .enable(1'b1),
         .pixel_in(gray_blur),  // 1차 가우시안 출력
@@ -384,7 +389,9 @@ module digital_cam_top (
     );
 
     // 캐니 엣지 검출 (1차 가우시안 지연에 맞춘 타이밍)
-    canny_3x3_gray8 canny_inst (
+    canny_3x3_gray8 #(
+        .IMG_WIDTH(640)
+    ) canny_inst (
         .clk(clk_25_vga),
         .enable(filter_ready),
         .pixel_in(gray_blur),   // 1차 가우시안 출력
@@ -429,12 +436,12 @@ module digital_cam_top (
         .c1(clk_25_vga)
     );
 
-    // VGA 컨트롤러 (320→640 복제 출력)
+    // VGA 컨트롤러
     vga_640 vga_inst (
-        .CLK25(clk_25_vga), 
-        .pixel_data(rddata), 
+        .CLK25(clk_25_vga),
+        .pixel_data(rddata),
         .clkout(vga_CLK),
-        .Hsync(hsync_raw), 
+        .Hsync(hsync_raw),
         .Vsync(vsync_raw),
         .Nblank(vga_blank_N_raw), 
         .Nsync(vga_sync_N_raw),
