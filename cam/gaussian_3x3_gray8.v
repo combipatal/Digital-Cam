@@ -84,10 +84,14 @@ module gaussian_3x3_gray8 #(
                 l1_2  <= l1_1;  l1_1  <= l1_0;  l1_0  <= line1_tap;
                 l2_2  <= l2_1;  l2_1  <= l2_0;  l2_0  <= line2_tap;
 
-                sum_blur <= (cur_2 + cur_0 + l2_2 + l2_0)
-                        + ((cur_1 + l1_2 + l1_0 + l2_1) << 1)
-                        + (l1_1 << 2);
-
+                // Gaussian Kernel:
+                // [1 2 1]
+                // [2 4 2]
+                // [1 2 1]
+                sum_blur <= (cur_2 * 1) + (cur_1 * 2) + (cur_0 * 1)
+                          + (l1_2  * 2) + (l1_1  * 4) + (l1_0  * 2)
+                          + (l2_2  * 1) + (l2_1  * 2) + (l2_0  * 1);
+                
                 // update line buffers
                 line2[col] <= line1_tap;
                 line1[col] <= pixel_in;
@@ -111,13 +115,13 @@ module gaussian_3x3_gray8 #(
     always @(posedge clk) begin
         if (enable && active_d1) begin
             if (border_d1) begin
-                // top/left 2 pixels -> black, report not-ready so upstream can mask
-                pixel_out   <= 8'h00;
+                // 경계 픽셀 처리: 원본 픽셀을 그대로 통과시키고, filter_ready는 0으로 설정
+                pixel_out   <= pixel_in_d1;
                 filter_ready <= 1'b0;
             end else if (window_valid_d1) begin
                 // valid 3x3 window -> filtered output
-                pixel_out   <= sum_blur[11:4];
-                filter_ready <= 1'b1;
+                pixel_out   <= sum_blur[11:4]; // sum / 16
+                filter_ready <= 1'b1; 
             end else begin
                 pixel_out   <= 8'h00;
                 filter_ready <= 1'b0;
@@ -129,4 +133,3 @@ module gaussian_3x3_gray8 #(
     end
 
 endmodule
-

@@ -68,18 +68,15 @@ module vga_640 (
     wire video_active = (Hcnt < HD) && (Vcnt < VD);
     assign Nblank = video_active;                 // assert during visible area
     assign clkout = CLK25;
+    
+    // activeArea는 639 픽셀만 활성화 (마지막 픽셀 제외하여 라인 넘김 방지)
+    wire active_limited = (Hcnt < (HD - 1)) && (Vcnt < VD);
 
-    // Maintain activeArea flag
-    always @(posedge CLK25) begin
-        activeArea <= video_active;
-    end
-
-    // Generate frame-buffer addresses two cycles ahead to compensate for the
-    // registered address/data latency of the dual-port RAM.  The prefetch
-    // logic reuses the end-of-line blanking interval to request the first two
-    // pixels of the next visible line so that the returned data lines up with
-    // the active video region without spilling pixels between scan-lines.
-    localparam [10:0] PREFETCH     = 11'd2;
+    // Issue frame-buffer addresses two cycles ahead. Timing flow:
+    // Clk N: Hcnt=N → addr_next=addr(N+2) [comb]
+    // Clk N+1: pixel_address=addr(N+2) [reg], rdaddress=addr(N+2) → RAM input
+    // Clk N+2: Hcnt=N+2, RAM output=data(N+2) [+1 total], activeArea_d1 valid
+    localparam [10:0] PREFETCH     = 11'd0;
     localparam [10:0] LINE_PERIOD  = 11'd800; // HM + 1
 
     wire [10:0] h_prefetch_full = {1'b0, Hcnt} + PREFETCH;
@@ -92,12 +89,19 @@ module vga_640 (
                           Vcnt;
 
     wire fetch_active = (h_fetch < HD) && (v_fetch < VD);
+    wire fetch_limited = (h_fetch < (HD - 1)) && (v_fetch < VD);  // 639 픽셀만
+
+    // Maintain activeArea flag aligned with fetch timing (마지막 픽셀 제외)
+    always @(posedge CLK25) begin
+        activeArea <= fetch_limited;
+    end
 
     wire [8:0] src_x = h_fetch[9:1];      // divide by 2 (0..319)
     wire [8:0] src_y = v_fetch[9:1];      // divide by 2 (0..239)
 
-    wire [16:0] line_base = {src_y, 8'b0} + {src_y, 6'b0}; // src_y*320
-    wire [16:0] addr_next = line_base + src_x;
+    // src_y * 320 = src_y * (256 + 64) = (src_y << 8) + (src_y << 6)
+    wire [16:0] line_base = {src_y, 8'b0} + {src_y, 6'b0};
+    wire [16:0] addr_next = line_base + {8'b0, src_x};
 
     // Register the computed address
     always @(posedge CLK25) begin

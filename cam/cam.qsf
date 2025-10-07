@@ -141,11 +141,9 @@ set_instance_assignment -name PARTITION_NETLIST_TYPE POST_FIT -to digital_cam_to
 # 캐니 필터 파티션
 set_instance_assignment -name PARTITION_NETLIST_TYPE POST_FIT -to digital_cam_top|canny_inst -section_id canny_filter_part
 set_global_assignment -name VERILOG_FILE vga_640.v
-set_global_assignment -name VERILOG_FILE ov7670_pipeline_top.v
 set_global_assignment -name VERILOG_FILE canny_3x3_gray8.v
 set_global_assignment -name VERILOG_FILE sobel_3x3_gray8.v
 set_global_assignment -name VERILOG_FILE gaussian_3x3_gray8.v
-set_global_assignment -name VERILOG_FILE VGA.v
 set_global_assignment -name VERILOG_FILE ov7670_controller.v
 set_global_assignment -name VERILOG_FILE ov7670_capture.v
 set_global_assignment -name VERILOG_FILE digital_cam_top.v
