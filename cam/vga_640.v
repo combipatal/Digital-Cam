@@ -74,22 +74,37 @@ module vga_640 (
         activeArea <= video_active;
     end
 
-    // Compute source coordinates (nearest neighbour doubling)
-    wire [9:0] disp_x = (Hcnt < HD) ? Hcnt : 10'd0;
-    wire [9:0] disp_y = (Vcnt < VD) ? Vcnt : 10'd0;
+    // Generate frame-buffer addresses two cycles ahead to compensate for the
+    // registered address/data latency of the dual-port RAM.  The prefetch
+    // logic reuses the end-of-line blanking interval to request the first two
+    // pixels of the next visible line so that the returned data lines up with
+    // the active video region without spilling pixels between scan-lines.
+    localparam [10:0] PREFETCH     = 11'd2;
+    localparam [10:0] LINE_PERIOD  = 11'd800; // HM + 1
 
-    wire [8:0] src_x = disp_x[9:1];      // divide by 2 (0..319)
-    wire [8:0] src_y = disp_y[9:1];      // divide by 2 (0..239)
+    wire [10:0] h_prefetch_full = {1'b0, Hcnt} + PREFETCH;
+    wire        wrap_next_line  = (h_prefetch_full >= LINE_PERIOD);
+    wire [9:0]  h_fetch = wrap_next_line ?
+                          (h_prefetch_full - LINE_PERIOD) :
+                          h_prefetch_full[9:0];
+    wire [9:0]  v_fetch = wrap_next_line ?
+                          ((Vcnt == VM) ? 10'd0 : (Vcnt + 1'b1)) :
+                          Vcnt;
 
-    wire [16:0] line_base = {src_y, 8'b0} + {src_y, 6'b0}; // src_y*256 + src_y*64
+    wire fetch_active = (h_fetch < HD) && (v_fetch < VD);
+
+    wire [8:0] src_x = h_fetch[9:1];      // divide by 2 (0..319)
+    wire [8:0] src_y = v_fetch[9:1];      // divide by 2 (0..239)
+
+    wire [16:0] line_base = {src_y, 8'b0} + {src_y, 6'b0}; // src_y*320
     wire [16:0] addr_next = line_base + src_x;
 
-    // Register the computed address (synchronous RAM latency compensation)
+    // Register the computed address
     always @(posedge CLK25) begin
-        if (!video_active)
-            pixel_address <= 17'd0;
-        else
+        if (fetch_active)
             pixel_address <= addr_next;
+        else
+            pixel_address <= 17'd0;
     end
 
 endmodule

@@ -359,7 +359,7 @@ module digital_cam_top (
         .IMG_WIDTH(640)
     ) gaussian_gray_inst (
         .clk(clk_25_vga),
-        .enable(1'b1),
+        .enable(1'b1),  // 내부에서 active_area로 윈도우 유효 여부를 판단
         .pixel_in(gray_value),
         .pixel_addr(rdaddress_aligned),
         .vsync(vsync_raw),
@@ -378,7 +378,7 @@ module digital_cam_top (
         .IMG_HEIGHT(480)
     ) sobel_inst (
         .clk(clk_25_vga),
-        .enable(1'b1),
+        .enable(1'b1),  // 내부에서 active_area로 윈도우 유효 여부를 판단
         .pixel_in(gray_blur),  // 1차 가우시안 출력
         .pixel_addr(rdaddress_gauss),  // 가우시안 지연에 맞춘 주소
         .vsync(vsync_raw),
@@ -393,7 +393,7 @@ module digital_cam_top (
         .IMG_WIDTH(640)
     ) canny_inst (
         .clk(clk_25_vga),
-        .enable(filter_ready),
+        .enable(1'b1),  // 내부에서 active_area로 윈도우 유효 여부를 판단
         .pixel_in(gray_blur),   // 1차 가우시안 출력
         .pixel_addr(rdaddress_gauss),  // 가우시안 지연에 맞춘 주소
         .vsync(vsync_raw),
