@@ -135,10 +135,10 @@ module digital_cam_top (
     reg vsync_prev_display = 1'b1;
 
     // ============================================================================
-    // 메모리 지연 보정 로직
+    // 메모리 지연 보정 로직 (RAM 2클럭 + MUX 1클럭 정렬)
     // ============================================================================
-    reg activeArea_d1 = 1'b0, activeArea_d2 = 1'b0;
-    reg [16:0] rdaddress_d1 = 17'd0, rdaddress_d2 = 17'd0;
+    reg activeArea_d1 = 1'b0, activeArea_d2 = 1'b0, activeArea_d3 = 1'b0;
+    reg [16:0] rdaddress_d1 = 17'd0, rdaddress_d2 = 17'd0, rdaddress_d3 = 17'd0;
 
     // ============================================================================
     // 버튼 디바운싱 로직
@@ -220,6 +220,8 @@ module digital_cam_top (
         activeArea_d2 <= activeArea_d1;
         rdaddress_d1  <= rdaddress;
         rdaddress_d2  <= rdaddress_d1;
+        activeArea_d3 <= activeArea_d2;
+        rdaddress_d3  <= rdaddress_d2;
     end
 
     // ============================================================================
@@ -243,9 +245,9 @@ module digital_cam_top (
                 canny_ready_delayed[i] <= 1'b0;
             end
         end else begin
-            // 0단계
-            rdaddress_delayed[0] <= rdaddress_d2;
-            activeArea_delayed[0] <= activeArea_d2;
+            // 0단계 (정렬 기준 d3)
+            rdaddress_delayed[0] <= rdaddress_d3;
+            activeArea_delayed[0] <= activeArea_d3;
             red_value_delayed[0] <= red_value;
             green_value_delayed[0] <= green_value;
             blue_value_delayed[0] <= blue_value;
@@ -276,9 +278,9 @@ module digital_cam_top (
     // ============================================================================
     // 신호 연결 및 데이터 변환
     // ============================================================================
-    // 정렬된 신호 (파이프라인 정렬 로직보다 먼저 선언)
-    wire activeArea_aligned = activeArea_d2;
-    wire [16:0] rdaddress_aligned = rdaddress_d2;
+    // 정렬된 신호 (RAM 2클럭 + MUX 1클럭 반영 후)
+    wire activeArea_aligned = activeArea_d3;
+    wire [16:0] rdaddress_aligned = rdaddress_d3;
 
     // 버튼 신호
     assign btn_rising_edge = btn_pressed & ~btn_pressed_prev;
@@ -296,13 +298,17 @@ module digital_cam_top (
     assign wren_ram1 = wren & ~wraddress[16];
     assign wren_ram2 = wren & wraddress[16];
 
-    // 읽기 주소 할당
-    assign rdaddress_ram1 = rdaddress_aligned[15:0];
-    wire [16:0] rdaddr_sub = rdaddress_aligned - 17'd32768;
+    // 읽기 주소 할당 (RAM에는 d2 입력 → 2클럭 후 데이터 유효, d3와 정렬)
+    assign rdaddress_ram1 = rdaddress_d2[15:0];
+    wire [16:0] rdaddr_sub = rdaddress_d2 - 17'd32768;
     assign rdaddress_ram2 = rdaddr_sub[15:0];
 
-    // 읽기 데이터 멀티플렉싱
-    assign rddata = rdaddress_aligned[16] ? rddata_ram2 : rddata_ram1;
+    // 읽기 데이터 멀티플렉싱 (1클럭 레지스터로 경계 글리치 방지)
+    reg [15:0] rddata_reg = 16'h0000;
+    always @(posedge clk_25_vga) begin
+        rddata_reg <= rdaddress_d2[16] ? rddata_ram2 : rddata_ram1;
+    end
+    assign rddata = rddata_reg;
 
     // RGB565 → RGB888 변환
     wire [7:0] r_888, g_888, b_888;
@@ -328,7 +334,26 @@ module digital_cam_top (
     // ============================================================================
     // 이미지 처리 모듈 인스턴스
     // ============================================================================
-    // 1차 가우시안 블러
+    // 1차 가우시안 블러 (320 속도에 맞춰 enable만 반클럭 활성화)
+    // 수평 복제 페이즈 생성: activeArea_aligned의 상승엣지에서 0으로 리셋 후 매 픽셀 토글
+    reg active_prev_aligned = 1'b0;
+    reg stretch_phase = 1'b0;
+    always @(posedge clk_25_vga) begin
+        active_prev_aligned <= activeArea_aligned;
+        if (!active_prev_aligned && activeArea_aligned) begin
+            stretch_phase <= 1'b0; // 라인 시작: 첫 픽셀은 비활성(복제 1st)
+        end else if (activeArea_aligned) begin
+            stretch_phase <= ~stretch_phase; // 유효구간 동안 0/1 토글
+        end
+    end
+    // 반클럭 위상을 2단계 동기화하여 하류 파이프라인과 정렬 (320 모드용 active_area 생성)
+    reg stretch_d1 = 1'b0, stretch_d2 = 1'b0;
+    always @(posedge clk_25_vga) begin
+        stretch_d1 <= stretch_phase;
+        stretch_d2 <= stretch_d1;
+    end
+    wire activeArea_320 = activeArea_aligned && stretch_d2;
+
     wire [7:0] gray_blur;
     gaussian_3x3_gray8 #(
         .IMG_WIDTH(640)
@@ -338,7 +363,7 @@ module digital_cam_top (
         .pixel_in(gray_value),
         .pixel_addr(rdaddress_aligned),
         .vsync(vsync_raw),
-        .active_area(activeArea_aligned),
+        .active_area(activeArea_320),
         .pixel_out(gray_blur),
         .filter_ready(filter_ready)
     );
@@ -357,7 +382,7 @@ module digital_cam_top (
         .pixel_in(gray_blur),  // 1차 가우시안 출력
         .pixel_addr(rdaddress_gauss),  // 가우시안 지연에 맞춘 주소
         .vsync(vsync_raw),
-        .active_area(activeArea_gauss),  // 가우시안 지연에 맞춘 활성영역
+        .active_area(activeArea_320),  // 320 모드 활성영역
         .threshold(sobel_threshold_btn),
         .pixel_out(sobel_value),
         .sobel_ready(sobel_ready)
@@ -372,7 +397,7 @@ module digital_cam_top (
         .pixel_in(gray_blur),   // 1차 가우시안 출력
         .pixel_addr(rdaddress_gauss),  // 가우시안 지연에 맞춘 주소
         .vsync(vsync_raw),
-        .active_area(activeArea_gauss),  // 가우시안 지연에 맞춘 활성영역
+        .active_area(activeArea_320),
         .threshold_low(canny_thr_low),
         .threshold_high(canny_thr_high),
         .pixel_out(canny_value),
