@@ -38,7 +38,10 @@ module canny_3x3_gray8 #(
     // ------------------------------------------------------------------
     // Stage-0: 3x3 pixel window (two line buffers + horizontal shift regs)
     // ------------------------------------------------------------------
-    reg [8:0] col = 9'd0;   // 0 .. IMG_WIDTH-1
+    localparam integer COL_BITS = (IMG_WIDTH <= 256) ? 8 :
+                                   (IMG_WIDTH <= 512) ? 9 : 10;
+
+    reg [COL_BITS-1:0] col = {COL_BITS{1'b0}};   // 0 .. IMG_WIDTH-1
     reg [9:0] row = 10'd0;  // counts active lines
 
     reg [7:0] line1 [0:IMG_WIDTH-1]; // previous line (y-1)
@@ -53,14 +56,14 @@ module canny_3x3_gray8 #(
 
     always @(posedge clk) begin
         if (frame_reset) begin
-            col <= 9'd0;
+            col <= {COL_BITS{1'b0}};
             row <= 10'd0;
             cur_0 <= 8'd0; cur_1 <= 8'd0; cur_2 <= 8'd0;
             l1_0  <= 8'd0; l1_1  <= 8'd0; l1_2  <= 8'd0;
             l2_0  <= 8'd0; l2_1  <= 8'd0; l2_2  <= 8'd0;
         end else begin
             if (line_start) begin
-                col <= 9'd0;
+                col <= {COL_BITS{1'b0}};
                 cur_0 <= 8'd0; cur_1 <= 8'd0; cur_2 <= 8'd0;
                 l1_0  <= 8'd0; l1_1  <= 8'd0; l1_2  <= 8'd0;
                 l2_0  <= 8'd0; l2_1  <= 8'd0; l2_2  <= 8'd0;
@@ -84,8 +87,8 @@ module canny_3x3_gray8 #(
         end
     end
 
-    wire window_ready = pixel_valid && (row >= 10'd2) && (col >= 9'd2);
-    wire border_flag  = pixel_valid && ((row < 10'd2) || (col < 9'd2));
+    wire window_ready = pixel_valid && (row >= 10'd2) && (col >= 2);
+    wire border_flag  = pixel_valid && ((row < 10'd2) || (col < 2));
 
     // Current 3x3 window taps (center is l1_1)
     wire [7:0] p00 = l2_2;
@@ -122,7 +125,7 @@ module canny_3x3_gray8 #(
     // ------------------------------------------------------------------
     // Stage-1: register coordinates, validity, and Sobel sums
     // ------------------------------------------------------------------
-    reg [8:0] col_s1 = 9'd0;
+    reg [COL_BITS-1:0] col_s1 = {COL_BITS{1'b0}};
     reg [9:0] row_s1 = 10'd0;
     reg       active_s1 = 1'b0;
     reg       window_valid_s1 = 1'b0;
@@ -133,7 +136,7 @@ module canny_3x3_gray8 #(
 
     always @(posedge clk) begin
         if (frame_reset) begin
-            col_s1 <= 9'd0;
+            col_s1 <= {COL_BITS{1'b0}};
             row_s1 <= 10'd0;
             active_s1 <= 1'b0;
             window_valid_s1 <= 1'b0;
@@ -160,7 +163,7 @@ module canny_3x3_gray8 #(
     // ------------------------------------------------------------------
     // Stage-2: clamp magnitude, quantize direction, track coordinates
     // ------------------------------------------------------------------
-    reg [8:0] col_s2 = 9'd0;
+    reg [COL_BITS-1:0] col_s2 = {COL_BITS{1'b0}};
     reg [9:0] row_s2 = 10'd0;
     reg       active_s2 = 1'b0;
     reg       window_valid_s2 = 1'b0;
@@ -171,7 +174,7 @@ module canny_3x3_gray8 #(
 
     always @(posedge clk) begin
         if (frame_reset) begin
-            col_s2 <= 9'd0;
+            col_s2 <= {COL_BITS{1'b0}};
             row_s2 <= 10'd0;
             active_s2 <= 1'b0;
             window_valid_s2 <= 1'b0;
@@ -209,7 +212,7 @@ module canny_3x3_gray8 #(
 
     reg [1:0] dir_mid0 = 2'b00, dir_mid1 = 2'b00, dir_mid2 = 2'b00;
 
-    reg [8:0] col_s3 = 9'd0;
+    reg [COL_BITS-1:0] col_s3 = {COL_BITS{1'b0}};
     reg [9:0] row_s3 = 10'd0;
     reg       active_s3 = 1'b0;
     reg       window_valid_s3 = 1'b0;
@@ -228,7 +231,7 @@ module canny_3x3_gray8 #(
             mag_l1_0 <= 8'd0; mag_l1_1 <= 8'd0; mag_l1_2 <= 8'd0;
             mag_l2_0 <= 8'd0; mag_l2_1 <= 8'd0; mag_l2_2 <= 8'd0;
             dir_mid0 <= 2'b00; dir_mid1 <= 2'b00; dir_mid2 <= 2'b00;
-            col_s3 <= 9'd0;
+            col_s3 <= {COL_BITS{1'b0}};
             row_s3 <= 10'd0;
             active_s3 <= 1'b0;
             window_valid_s3 <= 1'b0;
@@ -246,7 +249,7 @@ module canny_3x3_gray8 #(
                 dir_line2[col_s2] <= dir_line1[col_s2];
                 dir_line1[col_s2] <= dir_store;
 
-                if (col_s2 == 9'd0) begin
+                if (col_s2 == 0) begin
                     mag_cur2 <= 8'd0; mag_cur1 <= 8'd0; mag_cur0 <= mag_store;
                     mag_l1_2 <= 8'd0; mag_l1_1 <= 8'd0; mag_l1_0 <= mag_l1_tap;
                     mag_l2_2 <= 8'd0; mag_l2_1 <= 8'd0; mag_l2_0 <= mag_l2_tap;
