@@ -5,8 +5,8 @@ module digital_cam_top (
     input  wire        btn_resend,     // 카메라 설정 재시작 버튼
     input  wire        sw_grayscale,   // SW[0] 그레이스케일 모드 스위치
     input  wire        sw_sobel,       // SW[1] 소벨 필터 모드 스위치
-    input  wire        sw_filter,      // SW[2] 디지털 필터 모드 스위치
-    input  wire        sw_canny,       // SW[3] 캐니 엣지 모드 스위치
+    input  wire        sw_canny,       // SW[2] 캐니 엣지 모드 스위치
+    input  wire        sw_colortrack,  // SW[3] 색상 추적 모드 스위치
     output wire        led_config_finished,  // 설정 완료 LED
     
     // VGA 출력 신호들
@@ -87,6 +87,17 @@ module digital_cam_top (
     wire filter_ready;               // 필터 처리 완료 신호
     wire sobel_ready;                // 소벨 처리 완료 신호
     wire canny_ready;                // 캐니 처리 완료 신호
+
+    // Color Tracking Signals
+    wire [7:0] h_out, s_out, v_out;
+    wire hsv_valid;
+    wire color_track_out;
+    wire color_track_valid;
+    reg color_track_out_d1;
+
+    
+    // Reset signal for VGA domain (active low)
+    wire rst_n_vga_domain = 1'b1;  // 항상 활성화 (리셋 해제)
 
     // 파이프라인 지연 배열
     reg [16:0] rdaddress_delayed [PIPE_LATENCY:0];      // 주소 지연
@@ -227,6 +238,9 @@ module digital_cam_top (
     // ============================================================================
     integer i;
     always @(posedge clk_25_vga) begin
+        // Delay for color tracker output to align with main pipeline
+        color_track_out_d1 <= color_track_out;
+
         if (vsync_raw == 1'b0) begin
             // 프레임 시작 시 모든 지연 레지스터 클리어
             for (i = 0; i <= PIPE_LATENCY; i = i + 1) begin
@@ -379,6 +393,31 @@ module digital_cam_top (
         .canny_ready(canny_ready)
     );
 
+    // --- Color Tracking Modules ---
+    rgb_to_hsv rgb_to_hsv_inst (
+        .clk(clk_25_vga),
+        .rst_n(rst_n_vga_domain),
+        .valid_in(activeArea_d2),
+        .r_in(r_888),
+        .g_in(g_888),
+        .b_in(b_888),
+        .valid_out(hsv_valid),
+        .h_out(h_out),
+        .s_out(s_out),
+        .v_out(v_out)
+    );
+
+    color_tracker color_tracker_inst (
+        .clk(clk_25_vga),
+        .rst_n(rst_n_vga_domain),
+        .valid_in(hsv_valid),
+        .h_in(h_out),
+        .s_in(s_out),
+        .v_in(v_out),
+        .valid_out(color_track_valid),
+        .is_target_out(color_track_out)
+    );
+
     // ============================================================================
     // 출력 선택 및 VGA 연결
     // ============================================================================
@@ -389,12 +428,17 @@ module digital_cam_top (
     wire [7:0] sel_gray = activeArea_delayed[IDX_GRAY] ? gray_value_delayed[IDX_GRAY] : 8'h00;
     wire [7:0] sel_sobel = (activeArea_delayed[IDX_SOBEL] && sobel_ready_delayed[IDX_SOBEL]) ? sobel_value_delayed[IDX_SOBEL] : 8'h00;
     wire [7:0] sel_canny = (activeArea_delayed[IDX_CANNY] && canny_ready_delayed[IDX_CANNY]) ? canny_value_delayed[IDX_CANNY] : 8'h00;
+    
+    // Define color for the tracking output mask
+    wire [7:0] sel_colortrack_r = color_track_out_d1 ? 8'hFF : 8'h00; // Red
+    wire [7:0] sel_colortrack_g = 8'h00;                               // Black
+    wire [7:0] sel_colortrack_b = 8'h00;                               // Black
 
     // 스위치 로직
     wire [7:0] final_r, final_g, final_b;
-    assign final_r = sw_canny ? sel_canny : (sw_sobel ? sel_sobel : (sw_grayscale ? sel_gray : sel_orig_r));
-    assign final_g = sw_canny ? sel_canny : (sw_sobel ? sel_sobel : (sw_grayscale ? sel_gray : sel_orig_g));
-    assign final_b = sw_canny ? sel_canny : (sw_sobel ? sel_sobel : (sw_grayscale ? sel_gray : sel_orig_b));
+    assign final_r = sw_colortrack ? sel_colortrack_r : (sw_canny ? sel_canny : (sw_sobel ? sel_sobel : (sw_grayscale ? sel_gray : sel_orig_r)));
+    assign final_g = sw_colortrack ? sel_colortrack_g : (sw_canny ? sel_canny : (sw_sobel ? sel_sobel : (sw_grayscale ? sel_gray : sel_orig_g)));
+    assign final_b = sw_colortrack ? sel_colortrack_b : (sw_canny ? sel_canny : (sw_sobel ? sel_sobel : (sw_grayscale ? sel_gray : sel_orig_b)));
 
     // activeArea_aligned 대신 파이프라인 최종단에 정렬된 activeArea_delayed[IDX_ORIG] 사용
     assign vga_r = (vga_enable && activeArea_delayed[IDX_ORIG]) ? final_r : 8'h00;

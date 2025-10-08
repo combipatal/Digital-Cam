@@ -101,6 +101,8 @@ module vga_640 (
 
     // src_y * 320 = src_y * (256 + 64) = (src_y << 8) + (src_y << 6)
     wire [16:0] line_base = {src_y, 8'b0} + {src_y, 6'b0};
+    // HACK: Add +1 to compensate for an unknown -1 offset elsewhere in the
+    // system, which causes a line-wrapping artifact. This fixes the symptom.
     wire [16:0] addr_next = line_base + {8'b0, src_x} + 17'd1;
 
     // Register the computed address
