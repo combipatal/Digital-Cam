@@ -7,7 +7,7 @@ module ov7670_capture #(
     parameter         HI_BYTE_FIRST   = 1,  // 1: [15:8] 먼저, 그 다음 [7:0]
     parameter         BGR_ORDER       = 0,  // 0: RGB565, 1: BGR565 출력 스왑
     // 라인 시작 후 무시할 입력 픽셀 수 (RGB565 단위)
-    parameter integer LINE_SKIP_PIXELS = 3
+    parameter integer LINE_SKIP_PIXELS = 0
 )(
     input  wire        pclk,
     input  wire        vsync,

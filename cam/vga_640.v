@@ -91,9 +91,9 @@ module vga_640 (
     wire fetch_active = (h_fetch < HD) && (v_fetch < VD);
     wire fetch_limited = (h_fetch < (HD - 1)) && (v_fetch < VD);  // 639 픽셀만
 
-    // Maintain activeArea flag aligned with fetch timing (마지막 픽셀 제외)
+    // Maintain activeArea flag aligned with fetch timing
     always @(posedge CLK25) begin
-        activeArea <= fetch_limited;
+        activeArea <= fetch_active;
     end
 
     wire [8:0] src_x = h_fetch[9:1];      // divide by 2 (0..319)
@@ -101,7 +101,7 @@ module vga_640 (
 
     // src_y * 320 = src_y * (256 + 64) = (src_y << 8) + (src_y << 6)
     wire [16:0] line_base = {src_y, 8'b0} + {src_y, 6'b0};
-    wire [16:0] addr_next = line_base + {8'b0, src_x};
+    wire [16:0] addr_next = line_base + {8'b0, src_x} + 17'd1;
 
     // Register the computed address
     always @(posedge CLK25) begin

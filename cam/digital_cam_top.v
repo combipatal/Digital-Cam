@@ -243,9 +243,9 @@ module digital_cam_top (
                 canny_ready_delayed[i] <= 1'b0;
             end
         end else begin
-            // 0단계 (정렬 기준 d1)
-            rdaddress_delayed[0] <= rdaddress_d1;
-            activeArea_delayed[0] <= activeArea_d1;
+            // 0단계 (정렬 기준 d2)
+            rdaddress_delayed[0] <= rdaddress_d2;
+            activeArea_delayed[0] <= activeArea_d2;
             red_value_delayed[0] <= red_value;
             green_value_delayed[0] <= green_value;
             blue_value_delayed[0] <= blue_value;
@@ -277,8 +277,8 @@ module digital_cam_top (
     // 신호 연결 및 데이터 변환
     // ============================================================================
     // 정렬된 신호 (RAM 2클럭 반영 후)
-    wire activeArea_aligned = activeArea_d1;  // 테스트: d1으로 변경
-    wire [16:0] rdaddress_aligned = rdaddress_d1;
+    wire activeArea_aligned = activeArea_d2; 
+    wire [16:0] rdaddress_aligned = rdaddress_d2;
 
     // 버튼 신호
     assign btn_rising_edge = btn_pressed & ~btn_pressed_prev;
@@ -289,7 +289,7 @@ module digital_cam_top (
 
     // 메모리 주소 할당
     assign wraddress_ram1 = wraddress[15:0];
-    wire [16:0] wraddr_sub = wraddress - 17'd32768;
+    wire [16:0] wraddr_sub = wraddress - 17'd65536;
     assign wraddress_ram2 = wraddr_sub[15:0];
     assign wrdata_ram1 = wrdata;
     assign wrdata_ram2 = wrdata;
@@ -298,7 +298,7 @@ module digital_cam_top (
 
     // 읽기 주소 할당 (RAM에는 rdaddress 직접 입력 → RAM 2클럭 후 d2와 정렬)
     assign rdaddress_ram1 = rdaddress[15:0];
-    wire [16:0] rdaddr_sub = rdaddress - 17'd32768;
+    wire [16:0] rdaddr_sub = rdaddress - 17'd65536;
     assign rdaddress_ram2 = rdaddr_sub[15:0];
 
     // 읽기 데이터 멀티플렉싱 (조합 논리)
