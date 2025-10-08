@@ -1,3 +1,4 @@
+
 // ============================================================================
 // Module: color_tracker
 // Description: Checks if an HSV pixel falls within a specified color range.

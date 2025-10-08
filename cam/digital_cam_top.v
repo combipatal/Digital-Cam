@@ -1,12 +1,7 @@
 module digital_cam_top (
-    input  wire        btn_thr_up,     // Sobel 임계 증가 버튼 (액티브 로우)
-    input  wire        btn_thr_down,   // Sobel 임계 감소 버튼 (액티브 로우)
     input  wire        clk_50,         // 50MHz 시스템 클럭
     input  wire        btn_resend,     // 카메라 설정 재시작 버튼
-    input  wire        sw_grayscale,   // SW[0] 그레이스케일 모드 스위치
-    input  wire        sw_sobel,       // SW[1] 소벨 필터 모드 스위치
-    input  wire        sw_canny,       // SW[2] 캐니 엣지 모드 스위치
-    input  wire        sw_colortrack,  // SW[3] 색상 추적 모드 스위치
+    input  wire        ir_rx,          // IR 수신기 입력
     output wire        led_config_finished,  // 설정 완료 LED
     
     // VGA 출력 신호들
@@ -121,12 +116,66 @@ module digital_cam_top (
     reg btn_pressed_prev = 1'b0;
     wire btn_rising_edge;
 
-    // Sobel 임계값 제어용 버튼 디바운싱
-    reg [19:0] up_cnt = 20'd0;
-    reg [19:0] down_cnt = 20'd0;
-    reg up_stable = 1'b0, up_prev = 1'b0;
-    reg down_stable = 1'b0, down_prev = 1'b0;
-    wire up_pulse, down_pulse;
+
+
+    // IR Control Logic
+    // Key Codes
+    localparam KEY_A    = 8'h0F;
+    localparam KEY_B    = 8'h13;
+    localparam KEY_C    = 8'h10;
+    localparam KEY_UP   = 8'h1A;
+    localparam KEY_DOWN = 8'h1E;
+    localparam KEY_1    = 8'h01;
+    localparam KEY_ORIG = 8'h17; // Using 'OK' button for original mode
+
+    // Filter mode state register
+    localparam MODE_ORIG  = 3'd0;
+    localparam MODE_GRAY  = 3'd1;
+    localparam MODE_SOBEL = 3'd2;
+    localparam MODE_CANNY = 3'd3;
+    localparam MODE_COLOR = 3'd4;
+
+    reg [2:0] active_filter_mode = MODE_ORIG;
+
+    // IR Receiver outputs
+    wire [7:0] ir_code;
+    wire ir_valid;
+    wire rst_n_50m;
+
+    // IR command pulses
+    reg ir_up_pulse = 1'b0;
+    reg ir_down_pulse = 1'b0;
+
+    assign rst_n_50m = ~btn_pressed; // Active low reset from debounced button
+
+    // Instantiate IR Receiver
+    IR_RECEVER ir_inst (
+        .clk(clk_50),
+        .rst_n(rst_n_50m),
+        .IRDA_RXD(ir_rx),
+        .captured_code(ir_code),
+        .data_valid(ir_valid)
+    );
+
+    // IR Command Decoder
+    always @(posedge clk_50) begin
+        // Pulses are active for one cycle
+        ir_up_pulse <= 1'b0;
+        ir_down_pulse <= 1'b0;
+
+        if (ir_valid) begin
+            case (ir_code)
+                KEY_A:    active_filter_mode <= MODE_GRAY;
+                KEY_B:    active_filter_mode <= MODE_SOBEL;
+                KEY_C:    active_filter_mode <= MODE_CANNY;
+                KEY_1:    active_filter_mode <= MODE_COLOR;
+                KEY_ORIG: active_filter_mode <= MODE_ORIG;
+                KEY_UP:   ir_up_pulse <= 1'b1;
+                KEY_DOWN: ir_down_pulse <= 1'b1;
+                default:  ; // Do nothing for other keys
+            endcase
+        end
+    end
 
     // Sobel 임계값
     reg [7:0] sobel_threshold_btn = 8'd64;
@@ -168,29 +217,12 @@ module digital_cam_top (
         btn_pressed_prev <= btn_pressed;
     end
 
-    // Sobel 임계값 버튼
-    always @(posedge clk_50) begin
-        // UP 버튼
-        if (btn_thr_up == 1'b0) begin
-            if (up_cnt < 20'd1000000) up_cnt <= up_cnt + 1'b1; else up_stable <= 1'b1;
-        end else begin
-            up_cnt <= 20'd0; up_stable <= 1'b0;
-        end
-        up_prev <= up_stable;
-        
-        // DOWN 버튼
-        if (btn_thr_down == 1'b0) begin
-            if (down_cnt < 20'd1000000) down_cnt <= down_cnt + 1'b1; else down_stable <= 1'b1;
-        end else begin
-            down_cnt <= 20'd0; down_stable <= 1'b0;
-        end
-        down_prev <= down_stable;
-    end
+
 
     // Sobel 임계값 조정
     always @(posedge clk_50) begin
-        if (up_pulse)   sobel_threshold_btn <= (sobel_threshold_btn >= 8'd250) ? 8'd255 : (sobel_threshold_btn + 8'd5);
-        if (down_pulse) sobel_threshold_btn <= (sobel_threshold_btn <= 8'd5)   ? 8'd0   : (sobel_threshold_btn - 8'd5);
+        if (ir_up_pulse)   sobel_threshold_btn <= (sobel_threshold_btn >= 8'd250) ? 8'd255 : (sobel_threshold_btn + 8'd5);
+        if (ir_down_pulse) sobel_threshold_btn <= (sobel_threshold_btn <= 8'd5)   ? 8'd0   : (sobel_threshold_btn - 8'd5);
     end
 
     // ============================================================================
@@ -297,8 +329,7 @@ module digital_cam_top (
     // 버튼 신호
     assign btn_rising_edge = btn_pressed & ~btn_pressed_prev;
     assign resend = btn_rising_edge;
-    assign up_pulse = up_stable & ~up_prev;
-    assign down_pulse = down_stable & ~down_prev;
+
     assign vga_enable = vga_enable_reg;
 
     // 메모리 주소 할당
@@ -435,10 +466,41 @@ module digital_cam_top (
     wire [7:0] sel_colortrack_b = 8'h00;                               // Black
 
     // 스위치 로직
-    wire [7:0] final_r, final_g, final_b;
-    assign final_r = sw_colortrack ? sel_colortrack_r : (sw_canny ? sel_canny : (sw_sobel ? sel_sobel : (sw_grayscale ? sel_gray : sel_orig_r)));
-    assign final_g = sw_colortrack ? sel_colortrack_g : (sw_canny ? sel_canny : (sw_sobel ? sel_sobel : (sw_grayscale ? sel_gray : sel_orig_g)));
-    assign final_b = sw_colortrack ? sel_colortrack_b : (sw_canny ? sel_canny : (sw_sobel ? sel_sobel : (sw_grayscale ? sel_gray : sel_orig_b)));
+    reg [7:0] final_r, final_g, final_b;
+    always @(*) begin
+        case (active_filter_mode)
+            MODE_ORIG: begin
+                final_r = sel_orig_r;
+                final_g = sel_orig_g;
+                final_b = sel_orig_b;
+            end
+            MODE_GRAY: begin
+                final_r = sel_gray;
+                final_g = sel_gray;
+                final_b = sel_gray;
+            end
+            MODE_SOBEL: begin
+                final_r = sel_sobel;
+                final_g = sel_sobel;
+                final_b = sel_sobel;
+            end
+            MODE_CANNY: begin
+                final_r = sel_canny;
+                final_g = sel_canny;
+                final_b = sel_canny;
+            end
+            MODE_COLOR: begin
+                final_r = sel_colortrack_r;
+                final_g = sel_colortrack_g;
+                final_b = sel_colortrack_b;
+            end
+            default: begin
+                final_r = sel_orig_r;
+                final_g = sel_orig_g;
+                final_b = sel_orig_b;
+            end
+        endcase
+    end
 
     // activeArea_aligned 대신 파이프라인 최종단에 정렬된 activeArea_delayed[IDX_ORIG] 사용
     assign vga_r = (vga_enable && activeArea_delayed[IDX_ORIG]) ? final_r : 8'h00;
