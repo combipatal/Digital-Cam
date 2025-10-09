@@ -107,6 +107,9 @@ module digital_cam_top (
     reg sobel_ready_delayed [PIPE_LATENCY:0];           // 소벨 준비 지연
     reg canny_ready_delayed [PIPE_LATENCY:0];           // 캐니 준비 지연
 
+    // 배경 제거 출력을 위한 파이프라인
+    reg [15:0] bg_sub_out_delayed [5:0];
+
     // ============================================================================
     // 버튼 및 제어 로직
     // ============================================================================
@@ -123,10 +126,12 @@ module digital_cam_top (
     localparam KEY_A    = 8'h0F;
     localparam KEY_B    = 8'h13;
     localparam KEY_C    = 8'h10;
+    localparam KEY_1    = 8'h01;
     localparam KEY_UP   = 8'h1A;
     localparam KEY_DOWN = 8'h1E;
-    localparam KEY_1    = 8'h01;
-    localparam KEY_ORIG = 8'h17; // Using 'OK' button for original mode
+    localparam KEY_ORIG = 8'h12; // Using 'OK' button for original mode
+    localparam KEY_BG_MODE    = 8'h04;
+    localparam KEY_BG_CAPTURE = 8'h05;
 
     // Filter mode state register
     localparam MODE_ORIG  = 3'd0;
@@ -134,8 +139,22 @@ module digital_cam_top (
     localparam MODE_SOBEL = 3'd2;
     localparam MODE_CANNY = 3'd3;
     localparam MODE_COLOR = 3'd4;
+    localparam MODE_BG_SUB = 3'd5; // 배경 제거 모드
 
     reg [2:0] active_filter_mode = MODE_ORIG;
+
+    // Background Subtraction FSM
+    localparam BG_IDLE    = 2'd0; // 대기 상태
+    localparam BG_CAPTURE = 2'd1; // 배경 캡처 상태
+    reg [1:0] bg_fsm_state = BG_IDLE;
+
+    // Background buffer signals
+    wire wren_bg;
+    wire wren_bg_ram1, wren_bg_ram2;
+    wire [15:0] rddata_bg;
+    wire [15:0] rddata_bg_ram1, rddata_bg_ram2;
+    wire [15:0] bg_sub_out;
+
 
     // IR Receiver outputs
     wire [7:0] ir_code;
@@ -145,6 +164,7 @@ module digital_cam_top (
     // IR command pulses
     reg ir_up_pulse = 1'b0;
     reg ir_down_pulse = 1'b0;
+    reg capture_bg_trigger = 1'b0; // 배경 캡처 트리거
 
     assign rst_n_50m = ~btn_pressed; // Active low reset from debounced button
 
@@ -162,6 +182,7 @@ module digital_cam_top (
         // Pulses are active for one cycle
         ir_up_pulse <= 1'b0;
         ir_down_pulse <= 1'b0;
+        capture_bg_trigger <= 1'b0;
 
         if (ir_valid) begin
             case (ir_code)
@@ -172,6 +193,8 @@ module digital_cam_top (
                 KEY_ORIG: active_filter_mode <= MODE_ORIG;
                 KEY_UP:   ir_up_pulse <= 1'b1;
                 KEY_DOWN: ir_down_pulse <= 1'b1;
+                KEY_BG_MODE: active_filter_mode <= MODE_BG_SUB;
+                KEY_BG_CAPTURE: capture_bg_trigger <= 1'b1;
                 default:  ; // Do nothing for other keys
             endcase
         end
@@ -224,6 +247,23 @@ module digital_cam_top (
         if (ir_up_pulse)   sobel_threshold_btn <= (sobel_threshold_btn >= 8'd250) ? 8'd255 : (sobel_threshold_btn + 8'd5);
         if (ir_down_pulse) sobel_threshold_btn <= (sobel_threshold_btn <= 8'd5)   ? 8'd0   : (sobel_threshold_btn - 8'd5);
     end
+
+    // Background Capture FSM (pclk domain)
+    assign wren_bg = (bg_fsm_state == BG_CAPTURE) & wren;
+    always @(posedge ov7670_pclk) begin
+        case (bg_fsm_state)
+            BG_IDLE:
+                if (capture_bg_trigger)
+                    bg_fsm_state <= BG_CAPTURE;
+            BG_CAPTURE:
+                // Wait for one full frame (rising edge of vsync)
+                if (vsync_prev_pclk && !ov7670_vsync)
+                    bg_fsm_state <= BG_IDLE;
+            default:
+                bg_fsm_state <= BG_IDLE;
+        endcase
+    end
+
 
     // ============================================================================
     // 프레임 제어 로직
@@ -316,6 +356,12 @@ module digital_cam_top (
                 sobel_ready_delayed[i] <= sobel_ready_delayed[i-1];
                 canny_ready_delayed[i] <= canny_ready_delayed[i-1];
             end
+
+            // 배경 제거 출력 파이프라인
+            bg_sub_out_delayed[0] <= bg_sub_out;
+            for (i = 0; i < 5; i = i + 1) begin
+                bg_sub_out_delayed[i+1] <= bg_sub_out_delayed[i];
+            end
         end
     end
 
@@ -340,6 +386,8 @@ module digital_cam_top (
     assign wrdata_ram2 = wrdata;
     assign wren_ram1 = wren & ~wraddress[16];
     assign wren_ram2 = wren & wraddress[16];
+    assign wren_bg_ram1 = wren_bg & ~wraddress[16];
+    assign wren_bg_ram2 = wren_bg &  wraddress[16];
 
     // 읽기 주소 할당 (RAM에는 rdaddress 직접 입력 → RAM 2클럭 후 d2와 정렬)
     assign rdaddress_ram1 = rdaddress[15:0];
@@ -348,6 +396,7 @@ module digital_cam_top (
 
     // 읽기 데이터 멀티플렉싱 (조합 논리)
     assign rddata = rdaddress_d2[16] ? rddata_ram2 : rddata_ram1;
+    assign rddata_bg = rdaddress_d2[16] ? rddata_bg_ram2 : rddata_bg_ram1;
 
     // RGB565 → RGB888 변환
     wire [7:0] r_888, g_888, b_888;
@@ -465,6 +514,11 @@ module digital_cam_top (
     wire [7:0] sel_colortrack_g = 8'h00;                               // Black
     wire [7:0] sel_colortrack_b = 8'h00;                               // Black
 
+    // Background subtraction output (RGB565 -> RGB888)
+    wire [7:0] sel_bg_sub_r = {bg_sub_out_delayed[5][15:11], 3'b111};
+    wire [7:0] sel_bg_sub_g = {bg_sub_out_delayed[5][10:5],  2'b11};
+    wire [7:0] sel_bg_sub_b = {bg_sub_out_delayed[5][4:0],   3'b111};
+
     // 스위치 로직
     reg [7:0] final_r, final_g, final_b;
     always @(*) begin
@@ -494,6 +548,11 @@ module digital_cam_top (
                 final_g = sel_colortrack_g;
                 final_b = sel_colortrack_b;
             end
+            MODE_BG_SUB: begin
+                final_r = sel_bg_sub_r;
+                final_g = sel_bg_sub_g;
+                final_b = sel_bg_sub_b;
+            end
             default: begin
                 final_r = sel_orig_r;
                 final_g = sel_orig_g;
@@ -510,6 +569,15 @@ module digital_cam_top (
     // ============================================================================
     // 외부 모듈 인스턴스
     // ============================================================================
+    // Background Subtraction Module Instance
+    background_subtraction bg_sub_inst (
+        .clk(clk_25_vga),
+        .active_area(activeArea_d2),
+        .live_pixel_in(rddata), // 실시간 프레임 버퍼 출력
+        .bg_pixel_in(rddata_bg),   // 배경 프레임 버퍼 출력
+        .pixel_out(bg_sub_out)
+    );
+
     // PLL 인스턴스
     my_altpll pll_inst (
         .inclk0(clk_50),
@@ -571,14 +639,35 @@ module digital_cam_top (
         .q(rddata_ram1)
     );
 
-    frame_buffer_ram buffer_ram2 (
+    frame_buffer_ram_11k buffer_ram2 (
         .data(wrdata_ram2),
-        .wraddress(wraddress_ram2),
+        .wraddress(wraddress_ram2[13:0]),
         .wrclock(ov7670_pclk),
         .wren(wren_ram2),
-        .rdaddress(rdaddress_ram2[15:0]),
+        .rdaddress(rdaddress_ram2[13:0]),
         .rdclock(clk_25_vga),
         .q(rddata_ram2)
+    );
+
+    // 듀얼 배경 프레임 버퍼 RAM들
+    frame_buffer_ram bg_buffer_ram1 (
+        .data(wrdata_ram1), // Live video data is written
+        .wraddress(wraddress_ram1),
+        .wrclock(ov7670_pclk),
+        .wren(wren_bg_ram1), // Controlled by FSM
+        .rdaddress(rdaddress_ram1[15:0]),
+        .rdclock(clk_25_vga),
+        .q(rddata_bg_ram1)
+    );
+
+    frame_buffer_ram_11k bg_buffer_ram2 (
+        .data(wrdata_ram2), // Live video data is written
+        .wraddress(wraddress_ram2[13:0]),
+        .wrclock(ov7670_pclk),
+        .wren(wren_bg_ram2), // Controlled by FSM
+        .rdaddress(rdaddress_ram2[13:0]),
+        .rdclock(clk_25_vga),
+        .q(rddata_bg_ram2)
     );
 
 endmodule
