@@ -506,12 +506,13 @@ module digital_cam_top (
     wire [7:0] sel_bg_sub_g = {bg_sub_out_delayed[4][10:5],  2'b11};
     wire [7:0] sel_bg_sub_b = {bg_sub_out_delayed[4][4:0],   3'b111};
 
-    // 새 파이프라인 지연에 맞춘 배경 제거 플래그 지연 (3클럭 추가 지연)
-    reg adaptive_fg_flag_pipe [2:0];
+    // 배경 제거 플래그 지연
+    reg adaptive_fg_flag_delayed [4:0];
     always @(posedge clk_25_vga) begin
-        adaptive_fg_flag_pipe[0] <= adaptive_fg_flag; // adaptive_background 모듈의 latency는 4
-        adaptive_fg_flag_pipe[1] <= adaptive_fg_flag_pipe[0];
-        adaptive_fg_flag_pipe[2] <= adaptive_fg_flag_pipe[1];
+        adaptive_fg_flag_delayed[0] <= adaptive_fg_flag;
+        for (i = 0; i < 4; i = i + 1) begin
+            adaptive_fg_flag_delayed[i+1] <= adaptive_fg_flag_delayed[i];
+        end
     end
 
     // 스위치 로직
@@ -544,7 +545,7 @@ module digital_cam_top (
                 final_b = sel_colortrack_b;
             end
             MODE_BG_SUB: begin
-                if (adaptive_fg_flag_pipe[2]) begin // 최종 지연된 플래그 사용
+                if (adaptive_fg_flag_delayed[4]) begin
                     // 전경: 원본 색상 출력
                     final_r = sel_orig_r;
                     final_g = sel_orig_g;
