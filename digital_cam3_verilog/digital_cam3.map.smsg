@@ -1,5 +1,0 @@
-Warning (10273): Verilog HDL warning at sdram_controller.v(106): extended using "x" or "z" File: C:/altera/project/digital_cam3_ver/sdram_controller.v Line: 106
-Warning (10273): Verilog HDL warning at sdram_controller.v(413): extended using "x" or "z" File: C:/altera/project/digital_cam3_ver/sdram_controller.v Line: 413
-Warning (10273): Verilog HDL warning at sdram_controller.v(418): extended using "x" or "z" File: C:/altera/project/digital_cam3_ver/sdram_controller.v Line: 418
-Warning (10273): Verilog HDL warning at sdram_controller.v(422): extended using "x" or "z" File: C:/altera/project/digital_cam3_ver/sdram_controller.v Line: 422
-Warning (10268): Verilog HDL information at edge_modules.v(26): always construct contains both blocking and non-blocking assignments File: C:/altera/project/digital_cam3_ver/edge_modules.v Line: 26
