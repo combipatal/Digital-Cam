@@ -310,6 +310,7 @@ module digital_cam_top (
                 filter_ready_delayed[i] <= 1'b0;
                 sobel_ready_delayed[i] <= 1'b0;
                 canny_ready_delayed[i] <= 1'b0;
+                adaptive_fg_flag_delayed[i] <= 1'b0;
             end
         end else begin
             // 0단계 (정렬 기준 d2)
@@ -324,6 +325,7 @@ module digital_cam_top (
             filter_ready_delayed[0] <= filter_ready;
             sobel_ready_delayed[0] <= sobel_ready;
             canny_ready_delayed[0] <= canny_ready;
+            adaptive_fg_flag_delayed[0] <= adaptive_fg_flag;
             
             // 1-PIPE_LATENCY 단계 지연 체인
             for (i = 1; i <= PIPE_LATENCY; i = i + 1) begin
@@ -338,6 +340,7 @@ module digital_cam_top (
                 filter_ready_delayed[i] <= filter_ready_delayed[i-1];
                 sobel_ready_delayed[i] <= sobel_ready_delayed[i-1];
                 canny_ready_delayed[i] <= canny_ready_delayed[i-1];
+                adaptive_fg_flag_delayed[i] <= adaptive_fg_flag_delayed[i-1];
             end
 
             // 배경 제거 출력 파이프라인
@@ -507,13 +510,8 @@ module digital_cam_top (
     wire [7:0] sel_bg_sub_b = {bg_sub_out_delayed[4][4:0],   3'b111};
 
     // 배경 제거 플래그 지연
-    reg adaptive_fg_flag_delayed [4:0];
-    always @(posedge clk_25_vga) begin
-        adaptive_fg_flag_delayed[0] <= adaptive_fg_flag;
-        for (i = 0; i < 4; i = i + 1) begin
-            adaptive_fg_flag_delayed[i+1] <= adaptive_fg_flag_delayed[i];
-        end
-    end
+    reg adaptive_fg_flag_delayed [PIPE_LATENCY:0];
+    // This flag's pipeline is now integrated into the main pipeline block for synchronization.
 
     // 스위치 로직
     reg [7:0] final_r, final_g, final_b;
@@ -545,7 +543,7 @@ module digital_cam_top (
                 final_b = sel_colortrack_b;
             end
             MODE_BG_SUB: begin
-                if (adaptive_fg_flag_delayed[4]) begin
+                if (adaptive_fg_flag_delayed[IDX_ORIG]) begin
                     // 전경: 원본 색상 출력
                     final_r = sel_orig_r;
                     final_g = sel_orig_g;
@@ -611,7 +609,7 @@ module digital_cam_top (
         .ADDR_WIDTH(17),
         .PIXEL_WIDTH(16),
         .SHIFT_LG2(4),
-        .THRESHOLD(9'd80)
+        .THRESHOLD(9'd120)
     ) adaptive_bg_inst (
         .clk(clk_25_vga),
         .rst(1'b0),
