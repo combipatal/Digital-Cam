@@ -141,7 +141,7 @@ set_instance_assignment -name PARTITION_NETLIST_TYPE POST_FIT -to digital_cam_to
 set_instance_assignment -name PARTITION_NETLIST_TYPE POST_FIT -to digital_cam_top|canny_inst -section_id canny_filter_part
 set_location_assignment PIN_AD27 -to sw_colortrack
 set_location_assignment PIN_Y15 -to ir_rx
-set_global_assignment -name VERILOG_FILE background_subtraction.v
+set_global_assignment -name VERILOG_FILE adaptive_background.v
 set_global_assignment -name VERILOG_FILE IR_RECEVER.v
 set_global_assignment -name VERILOG_FILE color_tracker.v
 set_global_assignment -name VERILOG_FILE rgb_to_hsv.v
