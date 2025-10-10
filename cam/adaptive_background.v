@@ -3,8 +3,8 @@
 module adaptive_background #(
     parameter integer ADDR_WIDTH    = 17,
     parameter integer PIXEL_WIDTH   = 16,
-    parameter integer SHIFT_LG2     = 3, // Rate: 1/8
-    parameter integer FG_SHIFT_LG2  = 7, // Rate: 1/128
+    parameter integer SHIFT_LG2     = 4, // Rate: 1/16
+    parameter integer FG_SHIFT_LG2  = 8, // Rate: 1/256
     parameter integer THRESHOLD     = 9'd80
 ) (
     input  wire                     clk,

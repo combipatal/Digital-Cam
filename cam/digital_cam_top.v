@@ -131,7 +131,6 @@ module digital_cam_top (
     localparam KEY_DOWN = 8'h1E;
     localparam KEY_ORIG = 8'h12; // Using 'OK' button for original mode
     localparam KEY_BG_MODE    = 8'h04;
-    localparam KEY_BG_CAPTURE = 8'h05;
 
     // Filter mode state register
     localparam MODE_ORIG  = 3'd0;
@@ -164,7 +163,6 @@ module digital_cam_top (
     // IR command pulses
     reg ir_up_pulse = 1'b0;
     reg ir_down_pulse = 1'b0;
-    reg capture_bg_trigger = 1'b0; // 배경 캡처 트리거
 
     assign rst_n_50m = ~btn_pressed; // Active low reset from debounced button
 
@@ -182,7 +180,6 @@ module digital_cam_top (
         // Pulses are active for one cycle
         ir_up_pulse <= 1'b0;
         ir_down_pulse <= 1'b0;
-        capture_bg_trigger <= 1'b0;
 
         if (ir_valid) begin
             case (ir_code)
@@ -194,7 +191,6 @@ module digital_cam_top (
                 KEY_UP:   ir_up_pulse <= 1'b1;
                 KEY_DOWN: ir_down_pulse <= 1'b1;
                 KEY_BG_MODE: active_filter_mode <= MODE_BG_SUB;
-                KEY_BG_CAPTURE: capture_bg_trigger <= 1'b1;
                 default:  ; // Do nothing for other keys
             endcase
         end
@@ -574,33 +570,14 @@ module digital_cam_top (
     // ============================================================================
     // 적응형 배경제거 모듈
     // ============================================================================
-    wire bg_capture_pulse_vga;
-    reg  bg_capture_toggle = 1'b0;
-    reg  bg_capture_sync0 = 1'b0;
-    reg  bg_capture_sync1 = 1'b0;
     reg  bg_load_active = 1'b0;
 
-    always @(posedge clk_50) begin
-        if (!rst_n_50m) begin
-            bg_capture_toggle <= 1'b0;
-        end else if (capture_bg_trigger) begin
-            bg_capture_toggle <= ~bg_capture_toggle;
-        end
-    end
-
-    always @(posedge clk_25_vga) begin
-        bg_capture_sync0 <= bg_capture_toggle;
-        bg_capture_sync1 <= bg_capture_sync0;
-    end
-
-    assign bg_capture_pulse_vga = bg_capture_sync0 ^ bg_capture_sync1;
-
+    // On the first frame after reset/startup, load it as the initial background.
+    // This signal stays high until the first VSYNC, then goes low.
     always @(posedge clk_25_vga) begin
         if (!frame_ready_sync2) begin
-            bg_load_active <= 1'b1; // 첫 프레임을 배경으로 초기화
-        end else if (bg_capture_pulse_vga) begin
-            bg_load_active <= 1'b1;
-        end else if (!vsync_prev_display && vsync_raw) begin
+            bg_load_active <= 1'b1; // Initialize background on first frame
+        end else if (!vsync_prev_display && vsync_raw) begin // De-assert at the start of the next frame
             bg_load_active <= 1'b0;
         end
     end
@@ -609,7 +586,7 @@ module digital_cam_top (
         .ADDR_WIDTH(17),
         .PIXEL_WIDTH(16),
         .SHIFT_LG2(4),
-        .THRESHOLD(9'd120)
+        .THRESHOLD(9'd180) // Increased from 160 to further reduce noise
     ) adaptive_bg_inst (
         .clk(clk_25_vga),
         .rst(1'b0),
