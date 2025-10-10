@@ -45,16 +45,33 @@ module adaptive_background #(
     function [4:0] compress5; input [8:0] v; compress5 = (v[8] || v > 9'd255) ? (v[8] ? 5'd0 : 5'd31) : v[7:3]; endfunction
     function [5:0] compress6; input [8:0] v; compress6 = (v[8] || v > 9'd255) ? (v[8] ? 6'd0 : 6'd63) : v[7:2]; endfunction
 
+    // Grayscale conversion function (Y = 0.299R + 0.587G + 0.114B)
+    // Approximation: (77*R + 150*G + 29*B) >> 8
+    function [7:0] rgb_to_gray;
+        input [PIXEL_WIDTH-1:0] rgb;
+        reg [7:0] r, g, b;
+        reg [15:0] luma;
+        begin
+            r = expand5(rgb[15:11]);
+            g = expand6(rgb[10:5]);
+            b = expand5(rgb[4:0]);
+            luma = (r * 77) + (g * 150) + (b * 29);
+            rgb_to_gray = luma[15:8];
+        end
+    endfunction
+
     // Combinational logic for pipeline stages
     wire signed [8:0] diff_r_s1 = $signed({1'b0, expand5(live_s1[15:11])}) - $signed({1'b0, expand5(bg_s1[15:11])});
     wire signed [8:0] diff_g_s1 = $signed({1'b0, expand6(live_s1[10:5])}) - $signed({1'b0, expand6(bg_s1[10:5])});
     wire signed [8:0] diff_b_s1 = $signed({1'b0, expand5(live_s1[4:0])})   - $signed({1'b0, expand5(bg_s1[4:0])});
 
-    wire [8:0] abs_r_s2 = diff_r_s2[8] ? (~diff_r_s2 + 1) : diff_r_s2;
-    wire [8:0] abs_g_s2 = diff_g_s2[8] ? (~diff_g_s2 + 1) : diff_g_s2;
-    wire [8:0] abs_b_s2 = diff_b_s2[8] ? (~diff_b_s2 + 1) : diff_b_s2;
-    wire [10:0] abs_sum_s2 = abs_r_s2 + abs_g_s2 + abs_b_s2;
-    wire foreground_s2 = (abs_sum_s2 > threshold_s2);
+    // Grayscale difference calculation
+    wire [7:0] live_gray_s2 = rgb_to_gray(live_s2);
+    wire [7:0] bg_gray_s2   = rgb_to_gray(bg_s2);
+    wire signed [8:0] gray_diff_s2 = $signed({1'b0, live_gray_s2}) - $signed({1'b0, bg_gray_s2});
+    wire [8:0] abs_gray_diff_s2 = gray_diff_s2[8] ? (~gray_diff_s2 + 1) : gray_diff_s2;
+
+    wire foreground_s2 = (abs_gray_diff_s2 > threshold_s2);
 
     wire signed [8:0] delta_r_s2 = diff_r_s2 >>> SHIFT_LG2;
     wire signed [8:0] delta_g_s2 = diff_g_s2 >>> SHIFT_LG2;

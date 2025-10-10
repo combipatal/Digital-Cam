@@ -126,7 +126,9 @@ module digital_cam_top (
     localparam KEY_A    = 8'h0F;
     localparam KEY_B    = 8'h13;
     localparam KEY_C    = 8'h10;
-    localparam KEY_1    = 8'h01;
+    localparam KEY_1    = 8'h01; // Red
+    localparam KEY_2    = 8'h02; // Green
+    localparam KEY_3    = 8'h03; // Blue
     localparam KEY_UP   = 8'h1A;
     localparam KEY_DOWN = 8'h1E;
     localparam KEY_ORIG = 8'h12; // Using 'OK' button for original mode
@@ -143,9 +145,10 @@ module digital_cam_top (
     localparam MODE_BG_SUB = 3'd5; // 배경 제거 모드
 
     reg [2:0] active_filter_mode = MODE_ORIG;
+    reg [1:0] color_track_select = 2'b00; // 00:Red, 01:Green, 10:Blue
 
     // Background subtraction threshold, adjustable via IR remote
-    reg [8:0] bg_sub_threshold_btn = 9'd160;
+    reg [8:0] bg_sub_threshold_btn = 9'd40;
 
 
     // Adaptive background signals
@@ -196,7 +199,9 @@ module digital_cam_top (
                 KEY_A:    active_filter_mode <= MODE_GRAY;
                 KEY_B:    active_filter_mode <= MODE_SOBEL;
                 KEY_C:    active_filter_mode <= MODE_CANNY;
-                KEY_1:    active_filter_mode <= MODE_COLOR;
+                KEY_1:    begin active_filter_mode <= MODE_COLOR; color_track_select <= 2'b00; end // Red
+                KEY_2:    begin active_filter_mode <= MODE_COLOR; color_track_select <= 2'b01; end // Green
+                KEY_3:    begin active_filter_mode <= MODE_COLOR; color_track_select <= 2'b10; end // Blue
                 KEY_ORIG: active_filter_mode <= MODE_ORIG;
                 KEY_UP:   ir_up_pulse <= 1'b1;
                 KEY_DOWN: ir_down_pulse <= 1'b1;
@@ -256,7 +261,7 @@ module digital_cam_top (
         if (ir_up_pulse)   sobel_threshold_btn <= (sobel_threshold_btn >= 8'd250) ? 8'd255 : (sobel_threshold_btn + 8'd5);
         if (ir_down_pulse) sobel_threshold_btn <= (sobel_threshold_btn <= 8'd5)   ? 8'd0   : (sobel_threshold_btn - 8'd5);
         // Background Subtraction
-        if (ir_bg_thr_up_pulse)   bg_sub_threshold_btn <= (bg_sub_threshold_btn >= 9'd500) ? 9'd511 : (bg_sub_threshold_btn + 9'd5);
+        if (ir_bg_thr_up_pulse)   bg_sub_threshold_btn <= (bg_sub_threshold_btn >= 9'd255) ? 9'd255 : (bg_sub_threshold_btn + 9'd5);
         if (ir_bg_thr_down_pulse) bg_sub_threshold_btn <= (bg_sub_threshold_btn <= 9'd5)   ? 9'd0   : (bg_sub_threshold_btn - 9'd5);
     end
 
@@ -439,8 +444,6 @@ module digital_cam_top (
         .filter_ready(filter_ready)
     );
 
-    // 2차 가우시안 블러 제거 (1차 가우시안만 사용)
-
     // 소벨 엣지 검출 (1차 가우시안 지연에 맞춘 타이밍)
     wire [16:0] rdaddress_gauss = rdaddress_delayed[GAUSS_LAT];
     wire activeArea_gauss = activeArea_delayed[GAUSS_LAT];
@@ -489,10 +492,13 @@ module digital_cam_top (
         .v_out(v_out)
     );
 
-    color_tracker color_tracker_inst (
+    color_tracker #(
+        .DATA_WIDTH(8)
+    ) color_tracker_inst (
         .clk(clk_25_vga),
         .rst_n(rst_n_vga_domain),
         .valid_in(hsv_valid),
+        .color_select(color_track_select),
         .h_in(h_out),
         .s_in(s_out),
         .v_in(v_out),
@@ -555,7 +561,7 @@ module digital_cam_top (
                 final_b = sel_colortrack_b;
             end
             MODE_BG_SUB: begin
-                if (adaptive_fg_flag_delayed[IDX_ORIG]) begin
+                if (adaptive_fg_flag_delayed[IDX_ORIG - 4]) begin // adaptive_bg_inst 모듈의 4클럭 지연 보상
                     // 전경: 원본 색상 출력
                     final_r = sel_orig_r;
                     final_g = sel_orig_g;
