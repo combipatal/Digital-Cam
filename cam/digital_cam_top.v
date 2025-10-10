@@ -131,6 +131,8 @@ module digital_cam_top (
     localparam KEY_DOWN = 8'h1E;
     localparam KEY_ORIG = 8'h12; // Using 'OK' button for original mode
     localparam KEY_BG_MODE    = 8'h04;
+    localparam KEY_BG_THR_UP  = 8'h1B; // New key for increasing BG threshold
+    localparam KEY_BG_THR_DOWN= 8'h1F; // New key for decreasing BG threshold
 
     // Filter mode state register
     localparam MODE_ORIG  = 3'd0;
@@ -141,6 +143,10 @@ module digital_cam_top (
     localparam MODE_BG_SUB = 3'd5; // 배경 제거 모드
 
     reg [2:0] active_filter_mode = MODE_ORIG;
+
+    // Background subtraction threshold, adjustable via IR remote
+    reg [8:0] bg_sub_threshold_btn = 9'd160;
+
 
     // Adaptive background signals
     wire [15:0] bg_sub_out;
@@ -163,6 +169,8 @@ module digital_cam_top (
     // IR command pulses
     reg ir_up_pulse = 1'b0;
     reg ir_down_pulse = 1'b0;
+    reg ir_bg_thr_up_pulse = 1'b0;
+    reg ir_bg_thr_down_pulse = 1'b0;
 
     assign rst_n_50m = ~btn_pressed; // Active low reset from debounced button
 
@@ -180,6 +188,8 @@ module digital_cam_top (
         // Pulses are active for one cycle
         ir_up_pulse <= 1'b0;
         ir_down_pulse <= 1'b0;
+        ir_bg_thr_up_pulse <= 1'b0;
+        ir_bg_thr_down_pulse <= 1'b0;
 
         if (ir_valid) begin
             case (ir_code)
@@ -190,7 +200,9 @@ module digital_cam_top (
                 KEY_ORIG: active_filter_mode <= MODE_ORIG;
                 KEY_UP:   ir_up_pulse <= 1'b1;
                 KEY_DOWN: ir_down_pulse <= 1'b1;
-                KEY_BG_MODE: active_filter_mode <= MODE_BG_SUB;
+                KEY_BG_MODE:    active_filter_mode <= MODE_BG_SUB;
+                KEY_BG_THR_UP:  ir_bg_thr_up_pulse <= 1'b1;
+                KEY_BG_THR_DOWN:ir_bg_thr_down_pulse <= 1'b1;
                 default:  ; // Do nothing for other keys
             endcase
         end
@@ -238,10 +250,14 @@ module digital_cam_top (
 
 
 
-    // Sobel 임계값 조정
+    // Sobel & Background Subtraction Threshold Adjustment
     always @(posedge clk_50) begin
+        // Sobel
         if (ir_up_pulse)   sobel_threshold_btn <= (sobel_threshold_btn >= 8'd250) ? 8'd255 : (sobel_threshold_btn + 8'd5);
         if (ir_down_pulse) sobel_threshold_btn <= (sobel_threshold_btn <= 8'd5)   ? 8'd0   : (sobel_threshold_btn - 8'd5);
+        // Background Subtraction
+        if (ir_bg_thr_up_pulse)   bg_sub_threshold_btn <= (bg_sub_threshold_btn >= 9'd500) ? 9'd511 : (bg_sub_threshold_btn + 9'd5);
+        if (ir_bg_thr_down_pulse) bg_sub_threshold_btn <= (bg_sub_threshold_btn <= 9'd5)   ? 9'd0   : (bg_sub_threshold_btn - 9'd5);
     end
 
     // ============================================================================
@@ -586,7 +602,7 @@ module digital_cam_top (
         .ADDR_WIDTH(17),
         .PIXEL_WIDTH(16),
         .SHIFT_LG2(4),
-        .THRESHOLD(9'd180) // Increased from 160 to further reduce noise
+        .FG_SHIFT_LG2(8)
     ) adaptive_bg_inst (
         .clk(clk_25_vga),
         .rst(1'b0),
@@ -596,6 +612,7 @@ module digital_cam_top (
         .bg_pixel_in(rddata_bg),
         .active_in(activeArea_d2),
         .load_frame(bg_load_active),
+        .threshold_in(bg_sub_threshold_btn), // Connect the adjustable threshold
         .bg_wr_addr(bg_wr_addr),
         .bg_wr_data(bg_wr_data),
         .bg_wr_en(bg_wr_en),

@@ -3,9 +3,8 @@
 module adaptive_background #(
     parameter integer ADDR_WIDTH    = 17,
     parameter integer PIXEL_WIDTH   = 16,
-    parameter integer SHIFT_LG2     = 4, // Rate: 1/16
-    parameter integer FG_SHIFT_LG2  = 8, // Rate: 1/256
-    parameter integer THRESHOLD     = 9'd80
+    parameter integer SHIFT_LG2     = 3, // Rate: 1/8
+    parameter integer FG_SHIFT_LG2  = 7 // Rate: 1/128
 ) (
     input  wire                     clk,
     input  wire                     rst,
@@ -15,6 +14,7 @@ module adaptive_background #(
     input  wire [PIXEL_WIDTH-1:0]   bg_pixel_in,
     input  wire                     active_in,
     input  wire                     load_frame,
+    input  wire [8:0]               threshold_in, // New runtime-adjustable threshold
     output reg  [ADDR_WIDTH-1:0]    bg_wr_addr,
     output reg  [PIXEL_WIDTH-1:0]   bg_wr_data,
     output reg                      bg_wr_en,
@@ -34,6 +34,7 @@ module adaptive_background #(
     reg [PIXEL_WIDTH-1:0]  bg_s1, bg_s2, bg_s3;
     reg                    active_s1, active_s2, active_s3, active_s4;
     reg                    load_s1, load_s2, load_s3, load_s4;
+    reg [8:0]              threshold_s1, threshold_s2;
     reg signed [8:0]       diff_r_s2, diff_g_s2, diff_b_s2;
     reg                    foreground_s3, foreground_s4;
     reg signed [8:0]       final_delta_r_s3, final_delta_g_s3, final_delta_b_s3;
@@ -53,7 +54,7 @@ module adaptive_background #(
     wire [8:0] abs_g_s2 = diff_g_s2[8] ? (~diff_g_s2 + 1) : diff_g_s2;
     wire [8:0] abs_b_s2 = diff_b_s2[8] ? (~diff_b_s2 + 1) : diff_b_s2;
     wire [10:0] abs_sum_s2 = abs_r_s2 + abs_g_s2 + abs_b_s2;
-    wire foreground_s2 = (abs_sum_s2 > THRESHOLD);
+    wire foreground_s2 = (abs_sum_s2 > threshold_s2);
 
     wire signed [8:0] delta_r_s2 = diff_r_s2 >>> SHIFT_LG2;
     wire signed [8:0] delta_g_s2 = diff_g_s2 >>> SHIFT_LG2;
@@ -68,21 +69,23 @@ module adaptive_background #(
             // Reset logic should be added here if needed
         end else if (enable) begin
             // Stage 1
-            addr_s1   <= addr_in;
-            live_s1   <= live_pixel_in;
-            bg_s1     <= bg_pixel_in;
-            active_s1 <= active_in;
-            load_s1   <= load_frame;
+            addr_s1      <= addr_in;
+            live_s1      <= live_pixel_in;
+            bg_s1        <= bg_pixel_in;
+            active_s1    <= active_in;
+            load_s1      <= load_frame;
+            threshold_s1 <= threshold_in;
 
             // Stage 2
-            addr_s2   <= addr_s1;
-            live_s2   <= live_s1;
-            bg_s2     <= bg_s1;
-            active_s2 <= active_s1;
-            load_s2   <= load_s1;
-            diff_r_s2 <= diff_r_s1;
-            diff_g_s2 <= diff_g_s1;
-            diff_b_s2 <= diff_b_s1;
+            addr_s2      <= addr_s1;
+            live_s2      <= live_s1;
+            bg_s2        <= bg_s1;
+            active_s2    <= active_s1;
+            load_s2      <= load_s1;
+            threshold_s2 <= threshold_s1;
+            diff_r_s2    <= diff_r_s1;
+            diff_g_s2    <= diff_g_s1;
+            diff_b_s2    <= diff_b_s1;
 
             // Stage 3
             addr_s3   <= addr_s2;
