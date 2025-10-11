@@ -518,9 +518,32 @@ module digital_cam_top (
     wire [7:0] sel_canny = (activeArea_delayed[IDX_CANNY] && canny_ready_delayed[IDX_CANNY]) ? canny_value_delayed[IDX_CANNY] : 8'h00;
     
     // Define color for the tracking output mask
-    wire [7:0] sel_colortrack_r = color_track_out_d1 ? 8'hFF : 8'h00; // Red
-    wire [7:0] sel_colortrack_g = 8'h00;                               // Black
-    wire [7:0] sel_colortrack_b = 8'h00;                               // Black
+    // 추적된 픽셀을 해당 색상으로 표시
+    reg [7:0] sel_colortrack_r, sel_colortrack_g, sel_colortrack_b;
+    always @(*) begin
+        case (color_track_select)
+            2'b00: begin // Red tracking
+                sel_colortrack_r = color_track_out_d1 ? 8'hFF : 8'h00;
+                sel_colortrack_g = 8'h00;
+                sel_colortrack_b = 8'h00;
+            end
+            2'b01: begin // Green tracking
+                sel_colortrack_r = 8'h00;
+                sel_colortrack_g = color_track_out_d1 ? 8'hFF : 8'h00;
+                sel_colortrack_b = 8'h00;
+            end
+            2'b10: begin // Blue tracking
+                sel_colortrack_r = 8'h00;
+                sel_colortrack_g = 8'h00;
+                sel_colortrack_b = color_track_out_d1 ? 8'hFF : 8'h00;
+            end
+            default: begin
+                sel_colortrack_r = color_track_out_d1 ? 8'hFF : 8'h00;
+                sel_colortrack_g = 8'h00;
+                sel_colortrack_b = 8'h00;
+            end
+        endcase
+    end
 
     // Background subtraction output (RGB565 -> RGB888)
     wire [7:0] sel_bg_sub_r = {bg_sub_out_delayed[4][15:11], 3'b111};
