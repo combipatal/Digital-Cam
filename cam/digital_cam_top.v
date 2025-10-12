@@ -106,6 +106,8 @@ module digital_cam_top (
     reg filter_ready_delayed [PIPE_LATENCY:0];          // 필터 준비 지연
     reg sobel_ready_delayed [PIPE_LATENCY:0];           // 소벨 준비 지연
     reg canny_ready_delayed [PIPE_LATENCY:0];           // 캐니 준비 지연
+    reg [15:0] rddata_bg_delayed [PIPE_LATENCY:0];      // 배경 픽셀 데이터 지연
+    reg bg_load_active_delayed [PIPE_LATENCY:0];        // 배경 로드 신호 지연
 
     // 배경 제거 출력을 위한 파이프라인
     reg [15:0] bg_sub_out_delayed [4:0];
@@ -328,6 +330,8 @@ module digital_cam_top (
                 sobel_ready_delayed[i] <= 1'b0;
                 canny_ready_delayed[i] <= 1'b0;
                 adaptive_fg_flag_delayed[i] <= 1'b0;
+                rddata_bg_delayed[i] <= 16'd0;
+                bg_load_active_delayed[i] <= 1'b0;
             end
         end else begin
             // 0단계 (정렬 기준 d2)
@@ -343,6 +347,8 @@ module digital_cam_top (
             sobel_ready_delayed[0] <= sobel_ready;
             canny_ready_delayed[0] <= canny_ready;
             adaptive_fg_flag_delayed[0] <= adaptive_fg_flag;
+            rddata_bg_delayed[0] <= rddata_bg;
+            bg_load_active_delayed[0] <= bg_load_active;
             
             // 1-PIPE_LATENCY 단계 지연 체인
             for (i = 1; i <= PIPE_LATENCY; i = i + 1) begin
@@ -358,6 +364,8 @@ module digital_cam_top (
                 sobel_ready_delayed[i] <= sobel_ready_delayed[i-1];
                 canny_ready_delayed[i] <= canny_ready_delayed[i-1];
                 adaptive_fg_flag_delayed[i] <= adaptive_fg_flag_delayed[i-1];
+                rddata_bg_delayed[i] <= rddata_bg_delayed[i-1];
+                bg_load_active_delayed[i] <= bg_load_active_delayed[i-1];
             end
 
             // 배경 제거 출력 파이프라인
@@ -604,6 +612,10 @@ module digital_cam_top (
         end
     end
 
+    // The blurred gray output is 8-bit. Convert to 16-bit RGB565 format for the adaptive_bg module.
+    wire [15:0] blurred_pixel_for_bg;
+    assign blurred_pixel_for_bg = {gray_blur[7:3], gray_blur[7:2], gray_blur[7:3]};
+
     adaptive_background #(
         .ADDR_WIDTH(17),
         .PIXEL_WIDTH(16),
@@ -613,11 +625,12 @@ module digital_cam_top (
         .clk(clk_25_vga),
         .rst(1'b0),
         .enable(1'b1),
-        .addr_in(rdaddress_d2),
-        .live_pixel_in(rddata),
-        .bg_pixel_in(rddata_bg),
-        .active_in(activeArea_d2),
-        .load_frame(bg_load_active),
+        // Connect signals delayed by Gaussian filter latency
+        .addr_in(rdaddress_delayed[GAUSS_LAT]),
+        .live_pixel_in(blurred_pixel_for_bg),      // Use blurred data
+        .bg_pixel_in(rddata_bg_delayed[GAUSS_LAT]), // Use delayed background data
+        .active_in(activeArea_delayed[GAUSS_LAT]),
+        .load_frame(bg_load_active_delayed[GAUSS_LAT]), // Use delayed load signal
         .threshold_in(bg_sub_threshold_btn), // Connect the adjustable threshold
         .bg_wr_addr(bg_wr_addr),
         .bg_wr_data(bg_wr_data),
