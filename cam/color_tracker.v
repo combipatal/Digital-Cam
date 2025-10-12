@@ -40,8 +40,8 @@ module color_tracker # (
     localparam RED_H_MAX1 = 8'd15;   // ~22 deg
     localparam RED_H_MIN2 = 8'd240;  // ~338 deg
     localparam RED_H_MAX2 = 8'd255;
-    localparam RED_S_MIN  = 8'd140;  // 더 선명한 빨강 감지 (120 -> 140)
-    localparam RED_V_MIN  = 8'd90;   // 더 밝은 빨강만 감지 (70 -> 90)
+    localparam RED_S_MIN  = 8'd140;  
+    localparam RED_V_MIN  = 8'd90;  
 
     // Green
     localparam GREEN_H_MIN = 8'd60;  // ~85 deg

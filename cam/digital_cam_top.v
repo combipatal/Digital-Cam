@@ -309,12 +309,12 @@ module digital_cam_top (
     // 파이프라인 정렬
     // ============================================================================
     integer i;
-    always @(posedge clk_25_vga) begin
-        // Delay for color tracker output to align with main pipeline
+    always @(posedge clk_25_vga) begin  // Delay for color tracker output to align with main pipeline
         color_track_out_d1 <= color_track_out;
 
         if (vsync_raw == 1'b0) begin
             // 프레임 시작 시 모든 지연 레지스터 클리어
+      
             for (i = 0; i <= PIPE_LATENCY; i = i + 1) begin
                 rdaddress_delayed[i] <= 17'd0;
                 activeArea_delayed[i] <= 1'b0;
@@ -404,6 +404,26 @@ module digital_cam_top (
     // 읽기 데이터 멀티플렉싱 (조합 논리)
     assign rddata = rdaddress_d2[16] ? rddata_ram2 : rddata_ram1;
     assign rddata_bg = rdaddress_d2[16] ? rddata_bg_ram2 : rddata_bg_ram1;
+
+    // --- Dynamic Threshold Logic ---
+    // 1. Convert background pixel from RGB565 to RGB888
+    wire [7:0] bg_r_888, bg_g_888, bg_b_888;
+    assign bg_r_888 = {rddata_bg[15:11], 3'b111};
+    assign bg_g_888 = {rddata_bg[10:5],  2'b11};
+    assign bg_b_888 = {rddata_bg[4:0],   3'b111};
+
+    // 2. Calculate Luma (brightness) of the background pixel
+    wire [7:0] bg_luma;
+    wire [16:0] bg_gray_sum;
+    assign bg_gray_sum = (bg_r_888 << 6) + (bg_r_888 << 3) + (bg_r_888 << 2) +
+                         (bg_g_888 << 7) + (bg_g_888 << 4) + (bg_g_888 << 2) + (bg_g_888 << 1) +
+                         (bg_b_888 << 4) + (bg_b_888 << 3) + (bg_b_888 << 1);
+    assign bg_luma = activeArea_aligned ? bg_gray_sum[16:8] : 8'h00;
+
+    // 3. Calculate dynamic threshold
+    // Threshold = (Luma / 2) + Base_Threshold_from_IR_Remote
+    wire [8:0] dynamic_threshold = (bg_luma >> 1) + bg_sub_threshold_btn;
+    // --- End of Dynamic Threshold Logic ---
 
     // RGB565 → RGB888 변환
     wire [7:0] r_888, g_888, b_888;
@@ -641,7 +661,7 @@ module digital_cam_top (
         .bg_pixel_in(rddata_bg),
         .active_in(activeArea_d2),
         .load_frame(bg_load_active),
-        .threshold_in(bg_sub_threshold_btn), // Connect the adjustable threshold
+        .threshold_in(dynamic_threshold), // Connect the DYNAMIC threshold
         .bg_wr_addr(bg_wr_addr),
         .bg_wr_data(bg_wr_data),
         .bg_wr_en(bg_wr_en),
