@@ -98,10 +98,14 @@ module i2c_sender (
                 6'b000_000: sioc <= 1'b1;  // 대기 상태
                 default: sioc <= (divider[7:6] == 2'b00) ? 1'b0 : 
                                 (divider[7:6] == 2'b11) ? 1'b0 : 1'b1;  // 데이터 전송 중 클럭
+                // divider[7:6] = 2'b00: 0~63   (64 클럭) ->  sioc <= 1'b0;
+                // divider[7:6] = 2'b01: 64~127 (64 클럭) ->  sioc <= 1'b1;
+                // divider[7:6] = 2'b10: 128~191(64 클럭) ->  sioc <= 1'b1;
+                // divider[7:6] = 2'b11: 192~255(64 클럭) ->  sioc <= 1'b0;
             endcase
-            
+
             // 분주기가 최대값에 도달하면 다음 비트로 진행
-            if (divider == 8'hFF) begin
+            if (divider == 8'hFF) begin // 255 클럭  (5.12us 마다 1비트 시프트)
                 busy_sr <= {busy_sr[30:0], 1'b0};  // 상태 시프트 (왼쪽으로 1비트)
                 data_sr <= {data_sr[30:0], 1'b1};  // 데이터 시프트 (왼쪽으로 1비트)
                 divider <= 8'h00;  // 분주기 리셋

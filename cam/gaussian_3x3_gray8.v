@@ -1,66 +1,86 @@
-// 3x3 Gaussian blur for 8-bit grayscale (streaming)
-// - Uses two line buffers (image width deep) + 3-tap horizontal shift registers
-// - filter_ready is asserted only when a full 3x3 window is valid
-// - Designed for IMG_WIDTH = 320 by default (matches VGA active window)
+// ============================================================================
+// 3x3 가우시안 블러 필터 (8비트 그레이스케일, 스트리밍 방식)
+// ============================================================================
+// - 2개의 라인 버퍼 (이미지 너비만큼 깊이) + 수평 3-tap 시프트 레지스터 사용
+// - filter_ready는 완전한 3x3 윈도우가 유효할 때만 활성화
+// - 기본값: IMG_WIDTH = 320 (VGA 활성 윈도우와 일치)
+// ============================================================================
 module gaussian_3x3_gray8 #(
-    parameter integer IMG_WIDTH = 320
+    parameter integer IMG_WIDTH = 320  // 이미지 가로 크기 (픽셀)
 )(
-    input  wire        clk,
-    input  wire        enable,
-    input  wire [7:0]  pixel_in,
-    input  wire [16:0] pixel_addr,   // unused (kept for interface compatibility)
-    input  wire        vsync,        // active-low VSYNC from VGA controller
-    input  wire        active_area,  // 1 during active 320x240 window
-    output reg  [7:0]  pixel_out,
-    output reg         filter_ready
+    input  wire        clk,           // 시스템 클럭
+    input  wire        enable,        // 필터 활성화 신호
+    input  wire [7:0]  pixel_in,      // 입력 픽셀 (8비트 그레이스케일)
+    input  wire [16:0] pixel_addr,    // 픽셀 주소 (미사용, 인터페이스 호환성 유지)
+    input  wire        vsync,         // VGA 컨트롤러의 active-low VSYNC 신호
+    input  wire        active_area,   // 320x240 활성 윈도우 동안 1
+    output reg  [7:0]  pixel_out,     // 출력 픽셀 (블러 처리된 결과)
+    output reg         filter_ready    // 출력 데이터 유효 신호
 );
 
-    // Edge detectors
-    reg vsync_prev  = 1'b1;
-    reg active_prev = 1'b0;
+    // ============================================================================
+    // 엣지 검출기
+    // ============================================================================
+    reg vsync_prev  = 1'b1;  // 이전 클럭의 vsync 신호
+    reg active_prev = 1'b0;  // 이전 클럭의 active_area 신호
+    
     always @(posedge clk) begin
         vsync_prev  <= vsync;
         active_prev <= active_area;
     end
 
-    wire vsync_fall  = vsync_prev & ~vsync;           // VSYNC goes low (frame start in this design)
-    wire active_rise = active_area & ~active_prev;     // start of active line
-    wire active_fall = ~active_area & active_prev;     // end of active line
+    // 엣지 검출 신호
+    wire vsync_fall  = vsync_prev & ~vsync;           // VSYNC 하강 엣지 (프레임 시작)
+    wire active_rise = active_area & ~active_prev;     // active_area 상승 엣지 (활성 라인 시작)
+    wire active_fall = ~active_area & active_prev;     // active_area 하강 엣지 (활성 라인 종료)
 
-    // Position within active window
+    // ============================================================================
+    // 활성 윈도우 내 위치
+    // ============================================================================
     localparam integer COL_BITS = (IMG_WIDTH <= 256) ? 8 :
                                    (IMG_WIDTH <= 512) ? 9 : 10;
 
-    reg [COL_BITS-1:0] col = {COL_BITS{1'b0}};   // 0..IMG_WIDTH-1
-    reg [9:0] row = 10'd0;  // counts active lines, saturates
+    reg [COL_BITS-1:0] col = {COL_BITS{1'b0}};  // 현재 열 (0..IMG_WIDTH-1)
+    reg [9:0] row = 10'd0;  // 활성 라인 카운터 (포화)
 
-    // Two line buffers (previous two lines)
-    reg [7:0] line1 [0:IMG_WIDTH-1]; // line N-1
-    reg [7:0] line2 [0:IMG_WIDTH-1]; // line N-2
+    // ============================================================================
+    // 2개의 라인 버퍼 (이전 2개 라인 저장)
+    // ============================================================================
+    reg [7:0] line1 [0:IMG_WIDTH-1]; // 라인 N-1 (1 라인 전)
+    reg [7:0] line2 [0:IMG_WIDTH-1]; // 라인 N-2 (2 라인 전)
 
-    // Horizontal 3-tap shift registers per line
-    reg [7:0] cur_0 = 8'd0, cur_1 = 8'd0, cur_2 = 8'd0;  // current line taps (x, x-1, x-2)
-    reg [7:0] l1_0  = 8'd0, l1_1  = 8'd0, l1_2  = 8'd0;  // line1 taps     (x, x-1, x-2)
-    reg [7:0] l2_0  = 8'd0, l2_1  = 8'd0, l2_2  = 8'd0;  // line2 taps     (x, x-1, x-2)
+    // ============================================================================
+    // 라인별 수평 3-tap 시프트 레지스터
+    // ============================================================================
+    reg [7:0] cur_0 = 8'd0, cur_1 = 8'd0, cur_2 = 8'd0;  // 현재 라인 탭 (x, x-1, x-2)
+    reg [7:0] l1_0  = 8'd0, l1_1  = 8'd0, l1_2  = 8'd0;  // line1 탭 (x, x-1, x-2)
+    reg [7:0] l2_0  = 8'd0, l2_1  = 8'd0, l2_2  = 8'd0;  // line2 탭 (x, x-1, x-2)
 
-    // One-cycle pipeline for the weighted sum
-    reg [11:0] sum_blur = 12'd0; // max 16*255=4080
+    // ============================================================================
+    // 가중 합을 위한 1 클럭 파이프라인
+    // ============================================================================
+    reg [11:0] sum_blur = 12'd0;  // 최대값: 16*255 = 4080
 
-    // Delay valid by one cycle to align with sum pipeline
-    reg active_d1 = 1'b0;
-    reg window_valid_d1 = 1'b0;
-    reg [7:0] pixel_in_d1 = 8'd0;   // pass-through source for border
+    // ============================================================================
+    // 합 파이프라인에 맞추기 위해 1 클럭 지연
+    // ============================================================================
+    reg active_d1 = 1'b0;          // active_area 1 클럭 지연
+    reg window_valid_d1 = 1'b0;    // window_valid 1 클럭 지연
+    reg [7:0] pixel_in_d1 = 8'd0;  // 경계 처리를 위한 원본 픽셀 저장
 
-    // Read taps from line buffers at current column (combinational read of reg array)
-    wire [7:0] line1_tap = line1[col];
-    wire [7:0] line2_tap = line2[col];
-    // Border flag (top/left 2 pixels), delayed to stage-2
+    // 현재 열에서 라인 버퍼 읽기 (레지스터 배열의 조합 논리 읽기)
+    wire [7:0] line1_tap = line1[col];  // line1의 현재 열 픽셀
+    wire [7:0] line2_tap = line2[col];  // line2의 현재 열 픽셀
+    
+    // 경계 플래그 (상단/좌측 2 픽셀), stage-2로 지연
     reg border_d1 = 1'b0;
 
-    // Stage-1: advance window and compute weighted sum
+    // ============================================================================
+    // Stage-1: 윈도우 전진 및 가중 합 계산
+    // ============================================================================
     always @(posedge clk) begin
         if (vsync_fall) begin
-            // start of frame: reset position and taps
+            // 프레임 시작: 위치 및 탭 리셋
             col <= {COL_BITS{1'b0}};
             row <= 10'd0;
             {cur_0,cur_1,cur_2} <= 24'd0;
@@ -71,62 +91,78 @@ module gaussian_3x3_gray8 #(
             window_valid_d1 <= 1'b0;
         end else if (enable) begin
             if (active_rise) begin
-                // new active line: reset horizontal taps only
+                // 새로운 활성 라인: 수평 탭만 리셋
                 col <= {COL_BITS{1'b0}};
                 {cur_0,cur_1,cur_2} <= 24'd0;
                 {l1_0,l1_1,l1_2}    <= 24'd0;
                 {l2_0,l2_1,l2_2}    <= 24'd0;
                 sum_blur <= 12'd0;
-                // NOTE: row++ moved to active_fall
+                // 참고: row++는 active_fall로 이동
             end else if (active_area) begin
-                // regular shift
+                // 정규 시프트: 시프트 레지스터를 왼쪽으로 시프트
                 cur_2 <= cur_1; cur_1 <= cur_0; cur_0 <= pixel_in;
                 l1_2  <= l1_1;  l1_1  <= l1_0;  l1_0  <= line1_tap;
                 l2_2  <= l2_1;  l2_1  <= l2_0;  l2_0  <= line2_tap;
 
-                // Gaussian Kernel:
+                // ================================================================
+                // 가우시안 커널:
                 // [1 2 1]
                 // [2 4 2]
                 // [1 2 1]
-                sum_blur <= (cur_2 * 1) + (cur_1 * 2) + (cur_0 * 1)
-                          + (l1_2  * 2) + (l1_1  * 4) + (l1_0  * 2)
-                          + (l2_2  * 1) + (l2_1  * 2) + (l2_0  * 1);
+                // ================================================================
+                // 3x3 윈도우의 가중 합 계산
+                sum_blur <= (cur_2 * 1) + (cur_1 * 2) + (cur_0 * 1)  // 현재 라인
+                          + (l1_2  * 2) + (l1_1  * 4) + (l1_0  * 2)  // line1
+                          + (l2_2  * 1) + (l2_1  * 2) + (l2_0  * 1); // line2
                 
-                // update line buffers
-                line2[col] <= line1_tap;
-                line1[col] <= pixel_in;
+                // 라인 버퍼 업데이트
+                line2[col] <= line1_tap;  // line2에 line1 데이터 저장
+                line1[col] <= pixel_in;   // line1에 현재 픽셀 저장
 
+                // 열 카운터 증가
                 if (col < IMG_WIDTH-1) col <= col + 1'b1;
             end else if (active_fall) begin
-                // end of active line: now advance row
+                // 활성 라인 종료: 이제 행 증가
                 if (row < 10'd1023) row <= row + 1'b1;
             end
 
-            // pipeline-valid alignment
+            // 파이프라인 유효 신호 정렬
             active_d1       <= active_area;
-            window_valid_d1 <= (row >= 10'd2) && (col >= 2) && active_area;
+            window_valid_d1 <= (row >= 10'd2) && (col >= 2) && active_area;  // 완전한 3x3 윈도우
             pixel_in_d1     <= pixel_in;
-            border_d1       <= active_area && ((row < 10'd2) || (col < 2));
+            border_d1       <= active_area && ((row < 10'd2) || (col < 2));  // 경계 픽셀
         end
     end
 
 
-    // Stage-2: normalize and output
+    // ============================================================================
+    // Stage-2: 정규화 및 출력
+    // ============================================================================
     always @(posedge clk) begin
         if (enable && active_d1) begin
             if (border_d1) begin
-                // 경계 픽셀 처리: 원본 픽셀을 그대로 통과시키고, filter_ready는 0으로 설정
+                // ================================================================
+                // 경계 픽셀 처리: 원본 픽셀을 그대로 통과
+                // ================================================================
+                // 상단/좌측 2 픽셀은 3x3 윈도우가 불완전하므로 블러 처리 불가
+                // 원본 픽셀을 그대로 출력하고 filter_ready는 0으로 설정
                 pixel_out   <= pixel_in_d1;
                 filter_ready <= 1'b0;
             end else if (window_valid_d1) begin
-                // valid 3x3 window -> filtered output
-                pixel_out   <= sum_blur[11:4]; // sum / 16
-                filter_ready <= 1'b1; 
+                // ================================================================
+                // 유효한 3x3 윈도우 -> 필터링된 출력
+                // ================================================================
+                // 가중 합을 16으로 나누기 (4비트 우측 시프트)
+                // sum_blur[11:4] = sum_blur / 16
+                pixel_out   <= sum_blur[11:4];
+                filter_ready <= 1'b1;  // 출력 유효
             end else begin
+                // 비활성 영역 또는 윈도우 불완전
                 pixel_out   <= 8'h00;
                 filter_ready <= 1'b0;
             end
         end else begin
+            // enable 비활성 또는 active_d1 비활성
             pixel_out   <= 8'h00;
             filter_ready <= 1'b0;
         end

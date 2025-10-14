@@ -1,13 +1,13 @@
 // OV7670 캡처 모듈 - 2x2 박스 필터(평균) 디시메이션 (RGB565 -> RGB565)
+// 고정 설정:
+// - HI_BYTE_FIRST = 1 (상위 바이트 먼저)
+// - BGR_ORDER = 0 (RGB565 출력)
+// - LINE_SKIP_PIXELS = 0 (라인 스킵 없음)
 module ov7670_capture #(
-    parameter integer SRC_H           = 640,
-    parameter integer SRC_V           = 480,
-    parameter integer DST_H           = 320,
-    parameter integer DST_V           = 240,
-    parameter         HI_BYTE_FIRST   = 1,  // 1: [15:8] 먼저, 그 다음 [7:0]
-    parameter         BGR_ORDER       = 0,  // 0: RGB565, 1: BGR565 출력 스왑
-    // 라인 시작 후 무시할 입력 픽셀 수 (RGB565 단위)
-    parameter integer LINE_SKIP_PIXELS = 0
+    parameter integer SRC_H = 640,  // 소스 가로 크기
+    parameter integer SRC_V = 480,  // 소스 세로 크기
+    parameter integer DST_H = 320,  // 목적지 가로 크기
+    parameter integer DST_V = 240   // 목적지 세로 크기
 )(
     input  wire        pclk,
     input  wire        vsync,
@@ -35,18 +35,12 @@ module ov7670_capture #(
     reg        pix_valid;
 
     // 소스 좌표 및 라인 상태
-    reg [9:0]  src_x;      // 0..SRC_H-1
-    reg [8:0]  src_y;      // 0..SRC_V-1
-    reg        line_parity;// 0: 짝수 라인, 1: 홀수 라인
-    reg [8:0]  decim_x;    // 0..DST_H-1
-    reg [7:0]  decim_y;    // 0..DST_V-1
+    reg [9:0]  src_h;      // 0..SRC_H-1  원본 이미지 가로 좌표 (horizontal)
+    reg [8:0]  src_v;      // 0..SRC_V-1  원본 이미지 세로 좌표 (vertical)
+    reg        line_parity;// 0: 짝수 라인, 1: 홀수 라인    
+    reg [8:0]  decim_h;    // 0..DST_H-1  목적지 가로 좌표 (horizontal)
+    reg [7:0]  decim_v;    // 0..DST_V-1  목적지 세로 좌표 (vertical)  
 
-    // 라인 시작 스킵: RAW 픽셀은 버리지 않고, 초기 decimated 출력만 마스킹
-    // 출력 마스킹 개수 = ceil(LINE_SKIP_PIXELS/2)
-    localparam integer OUT_SKIP = (LINE_SKIP_PIXELS + 1) >> 1;
-    localparam [16:0] DST_H_17 = DST_H;
-    reg [9:0]  out_skip_cnt;  // 남은 출력 마스킹(디시메이션 결과) 개수
-    reg [9:0]  wcount;        // 이번 라인에서 소비한 출력 주소 수(0..DST_H)
     reg        have_p0;       // 수평 페어의 첫 픽셀 보유 여부
 
     // 이전 라인의 수평 2-픽셀 합 저장 (R6+R6, G7+G7, B6+B6 -> 총 19비트)
@@ -71,15 +65,13 @@ module ov7670_capture #(
     always @(posedge pclk) begin
         if (vsync_rise) begin
             // 프레임 시작 리셋
-            byte_phase    <= (HI_BYTE_FIRST) ? 1'b0 : 1'b1;
+            byte_phase    <= 1'b0;  // 상위 바이트 먼저 (고정)
             pix_valid     <= 1'b0;
-            src_x         <= 10'd0;
-            src_y         <= 9'd0;
+            src_h         <= 10'd0;
+            src_v         <= 9'd0;
             line_parity   <= 1'b0;
-            decim_x       <= 9'd0;
-            decim_y       <= 8'd0;
-            out_skip_cnt  <= 10'd0;
-            wcount        <= 10'd0;
+            decim_h       <= 9'd0;
+            decim_v       <= 8'd0;
             have_p0       <= 1'b0;
             we            <= 1'b0;
             wr_addr       <= 17'd0;
@@ -88,30 +80,25 @@ module ov7670_capture #(
 
             // 라인 시작 처리
             if (href_rise) begin
-                byte_phase    <= (HI_BYTE_FIRST) ? 1'b0 : 1'b1;
+                byte_phase    <= 1'b0;  // 상위 바이트 먼저 (고정)
                 pix_valid     <= 1'b0;
-                src_x         <= 10'd0;
-                decim_x       <= 9'd0;
-                out_skip_cnt  <= OUT_SKIP[9:0];
-                wcount        <= 10'd0;
+                src_h         <= 10'd0;
+                decim_h       <= 9'd0;
                 have_p0       <= 1'b0;
-                if (src_y < SRC_V-1)
-                    src_y <= src_y + 9'd1;
+                if (src_v < SRC_V-1)
+                    src_v <= src_v + 9'd1;
             end
 
-            // RGB565 픽셀 조립
+            // RGB565 픽셀 조립 (상위 바이트 먼저, 고정)
             if (href) begin
                 if (!byte_phase) begin
-                    first_byte <= d;
+                    first_byte <= d;      // 첫 번째 바이트 (상위 바이트)
                     byte_phase <= 1'b1;
                     pix_valid  <= 1'b0;
                 end else begin
                     byte_phase <= 1'b0;
                     pix_valid  <= 1'b1;
-                    if (HI_BYTE_FIRST)
-                        pix16 <= {first_byte, d};
-                    else
-                        pix16 <= {d, first_byte};
+                    pix16 <= {first_byte, d};  // {상위바이트, 하위바이트}
                 end
             end else begin
                 byte_phase <= 1'b0;
@@ -119,8 +106,8 @@ module ov7670_capture #(
             end
 
             // 디시메이션 + 평균 처리
-            if (pix_valid && (src_y < SRC_V) && (src_x < SRC_H)) begin
-                // RGB565 컴포넌트 추출 (RAW는 항상 모두 처리)
+            if (pix_valid && (src_v < SRC_V) && (src_h < SRC_H)) begin // 640, 480 영역 내에서만 처리
+                // RGB565 추출 (RAW는 항상 모두 처리)
                 r5 = pix16[15:11];
                 g6 = pix16[10:5];
                 b5 = pix16[4:0];
@@ -140,10 +127,10 @@ module ov7670_capture #(
 
                     if (line_parity == 1'b0) begin
                         // 짝수 라인: 수평 합 저장
-                        hpair_sum_prev[decim_x] <= {r_sum2, g_sum2, b_sum2};
+                        hpair_sum_prev[decim_h] <= {r_sum2, g_sum2, b_sum2};
                     end else begin
                         // 홀수 라인: 이전 합과 더해 2x2 평균 -> RGB565
-                        prev_pack = hpair_sum_prev[decim_x];
+                        prev_pack = hpair_sum_prev[decim_h];
                         r_prev2   = prev_pack[18:13];
                         g_prev2   = prev_pack[12:6];
                         b_prev2   = prev_pack[5:0];
@@ -155,48 +142,33 @@ module ov7670_capture #(
                         r_avg5 = r_sum4[6:2];
                         g_avg6 = g_sum4[7:2];
                         b_avg5 = b_sum4[6:2];
+                        // blocking로직 사용해야함 
+                        // RGB565 출력 (고정)
+                        out_pix <= {r_avg5, g_avg6, b_avg5};
 
-                        if (!BGR_ORDER)
-                            out_pix <= {r_avg5, g_avg6, b_avg5};
-                        else
-                            out_pix <= {b_avg5, g_avg6, r_avg5};
-
-                        // 초기 OUT_SKIP개 출력은 마스킹: 주소는 전진, we는 내림
-                        if (decim_y < DST_V) begin
-                            if (out_skip_cnt != 10'd0) begin
-                                // 초기 몇 개 출력은 주소 소비 없이 스킵 -> 좌측으로 시프트
-                                out_skip_cnt <= out_skip_cnt - 10'd1;
-                                we           <= 1'b0;
-                                // wr_addr, wcount 변화 없음
-                            end else begin
-                                we      <= 1'b1;
-                                wr_addr <= wr_addr + 17'd1;
-                                wcount  <= wcount + 10'd1;
-                            end
+                        // 출력 쓰기
+                        if (decim_v < DST_V) begin
+                            we      <= 1'b1;
+                            wr_addr <= wr_addr + 17'd1;
                         end
                     end
 
-                    // 수평 페어 하나 완료 -> x 인덱스 증가
-                    if (decim_x != DST_H-1)
-                        decim_x <= decim_x + 9'd1;
+                    // 수평 페어 하나 완료 -> 가로 인덱스 증가
+                    if (decim_h < DST_H-1)
+                        decim_h <= decim_h + 9'd1;
                 end
 
-                // 소스 x 증가
-                if (src_x != SRC_H-1)
-                    src_x <= src_x + 10'd1;
+                // 소스 가로 좌표 증가
+                if (src_h < SRC_H-1)
+                    src_h <= src_h + 10'd1;
             end
 
             // 라인 종료 처리
             if (href_fall) begin
                 line_parity <= ~line_parity;
-                // 홀수 라인 종료 시 y 인덱스 증가 (2x2 블록 1행)
-                if (line_parity == 1'b1 && decim_y < DST_V-1)
-                    decim_y <= decim_y + 8'd1;
-                // 홀수 라인 종료 시, 스킵으로 인해 적게 쓴 만큼 주소를 한 번에 보정
-                if (line_parity == 1'b1) begin
-                    wr_addr <= wr_addr + (DST_H_17 - {7'd0, wcount});
-                    wcount  <= 10'd0;
-                end
+                // 홀수 라인 종료 시 세로 인덱스 증가 (2x2 블록 1행)
+                if (line_parity == 1'b1 && decim_v < DST_V-1)
+                    decim_v <= decim_v + 8'd1;
             end
         end
     end
