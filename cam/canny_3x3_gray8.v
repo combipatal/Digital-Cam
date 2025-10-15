@@ -1,14 +1,14 @@
-// Revised Canny edge detector for 8-bit grayscale streams
-// - Proper 3x3 window formed with two line buffers (IMG_WIDTH deep)
-// - Computes Sobel magnitude + direction, applies NMS + hysteresis
-// - Output pixel corresponds to (x-1, y-1) of the input stream
-module canny_3x3_gray8 #(
+// 8비트 그레이스케일 스트림을 위한 Canny 엣지 검출기 수정 버전
+// - 2개의 라인 버퍼(IMG_WIDTH 깊이)를 사용하여 적절한 3x3 윈도우 형성
+// - Sobel 크기 + 방향 계산, 비최대 억제(NMS) 및 이력(hysteresis) 임계값 적용
+// - 출력 픽셀은 입력 스트림의 (x-1, y-1)에 해당
+module canny_3x3_gray8 # (
     parameter integer IMG_WIDTH = 320
 )(
     input  wire        clk,
     input  wire        enable,
     input  wire [7:0]  pixel_in,
-    input  wire [16:0] pixel_addr,   // kept for interface compatibility (unused)
+    input  wire [16:0] pixel_addr,   // 인터페이스 호환성을 위해 유지 (사용 안 함)
     input  wire        vsync,
     input  wire        active_area,
     input  wire [7:0]  threshold_low,
@@ -20,7 +20,7 @@ module canny_3x3_gray8 #(
     wire _unused_addr = &{1'b0, pixel_addr};
 
     // ------------------------------------------------------------------
-    // Timing helpers: detect frame/line boundaries
+    // 타이밍 헬퍼: 프레임/라인 경계 감지
     // ------------------------------------------------------------------
     reg vsync_prev  = 1'b1;
     reg active_prev = 1'b0;
@@ -29,23 +29,23 @@ module canny_3x3_gray8 #(
         active_prev <= active_area;
     end
 
-    wire frame_reset = vsync_prev & ~vsync;          // VSYNC falling edge
-    wire line_start  =  active_area & ~active_prev;  // rising edge of active window
-    wire line_end    = ~active_area &  active_prev;  // falling edge of active window
+    wire frame_reset = vsync_prev & ~vsync;          // VSYNC 하강 엣지
+    wire line_start  =  active_area & ~active_prev;  // 활성 윈도우의 상승 엣지
+    wire line_end    = ~active_area &  active_prev;  // 활성 윈도우의 하강 엣지
 
     wire pixel_valid = enable && active_area;
 
     // ------------------------------------------------------------------
-    // Stage-0: 3x3 pixel window (two line buffers + horizontal shift regs)
+    // 단계 0: 3x3 픽셀 윈도우 (2개의 라인 버퍼 + 수평 시프트 레지스터)
     // ------------------------------------------------------------------
     localparam integer COL_BITS = (IMG_WIDTH <= 256) ? 8 :
                                    (IMG_WIDTH <= 512) ? 9 : 10;
 
     reg [COL_BITS-1:0] col = {COL_BITS{1'b0}};   // 0 .. IMG_WIDTH-1
-    reg [9:0] row = 10'd0;  // counts active lines
+    reg [9:0] row = 10'd0;  // 활성 라인 카운트
 
-    reg [7:0] line1 [0:IMG_WIDTH-1]; // previous line (y-1)
-    reg [7:0] line2 [0:IMG_WIDTH-1]; // line y-2
+    reg [7:0] line1 [0:IMG_WIDTH-1]; // 이전 라인 (y-1)
+    reg [7:0] line2 [0:IMG_WIDTH-1]; // (y-2) 라인
 
     reg [7:0] cur_0 = 8'd0, cur_1 = 8'd0, cur_2 = 8'd0;
     reg [7:0] l1_0  = 8'd0, l1_1  = 8'd0, l1_2  = 8'd0;
@@ -90,7 +90,7 @@ module canny_3x3_gray8 #(
     wire window_ready = pixel_valid && (row >= 10'd2) && (col >= 2);
     wire border_flag  = pixel_valid && ((row < 10'd2) || (col < 2));
 
-    // Current 3x3 window taps (center is l1_1)
+    // 현재 3x3 윈도우 탭 (중심은 l1_1)
     wire [7:0] p00 = l2_2;
     wire [7:0] p01 = l2_1;
     wire [7:0] p02 = l2_0;
@@ -101,7 +101,7 @@ module canny_3x3_gray8 #(
     wire [7:0] p21 = cur_1;
     wire [7:0] p22 = cur_0;
 
-    // Sobel intermediate terms
+    // Sobel 중간 항
     wire [10:0] gx_pos = {3'b000,p02} + {2'b00,p12,1'b0} + {3'b000,p22};
     wire [10:0] gx_neg = {3'b000,p00} + {2'b00,p10,1'b0} + {3'b000,p20};
     wire [10:0] gy_pos = {3'b000,p00} + {2'b00,p01,1'b0} + {3'b000,p02};
@@ -123,7 +123,7 @@ module canny_3x3_gray8 #(
                           ((gx_signed_next[11] ^ gy_signed_next[11]) ? 2'b01 : 2'b11);
 
     // ------------------------------------------------------------------
-    // Stage-1: register coordinates, validity, and Sobel sums
+    // 단계 1: 좌표, 유효성, Sobel 합계 등록
     // ------------------------------------------------------------------
     reg [COL_BITS-1:0] col_s1 = {COL_BITS{1'b0}};
     reg [9:0] row_s1 = 10'd0;
@@ -161,7 +161,7 @@ module canny_3x3_gray8 #(
     end
 
     // ------------------------------------------------------------------
-    // Stage-2: clamp magnitude, quantize direction, track coordinates
+    // 단계 2: 크기 고정, 방향 양자화, 좌표 추적
     // ------------------------------------------------------------------
     reg [COL_BITS-1:0] col_s2 = {COL_BITS{1'b0}};
     reg [9:0] row_s2 = 10'd0;
@@ -199,7 +199,7 @@ module canny_3x3_gray8 #(
     end
 
     // ------------------------------------------------------------------
-    // Stage-3: magnitude/direction line buffers to build 3x3 mag window
+    // 단계 3: 3x3 크기 윈도우를 만들기 위한 크기/방향 라인 버퍼
     // ------------------------------------------------------------------
     reg [7:0] mag_line1 [0:IMG_WIDTH-1];
     reg [7:0] mag_line2 [0:IMG_WIDTH-1];
@@ -273,7 +273,7 @@ module canny_3x3_gray8 #(
     end
 
     // ------------------------------------------------------------------
-    // Stage-4: Non-maximum suppression & double threshold hysteresis
+    // 단계 4: 비최대 억제(NMS) 및 이중 임계값 이력(hysteresis)
     // ------------------------------------------------------------------
     wire [7:0] m00 = mag_l2_2;
     wire [7:0] m01 = mag_l2_1;
