@@ -97,9 +97,7 @@ module digital_cam_top (
     // 파이프라인 지연 배열
     reg [16:0] rdaddress_delayed [PIPE_LATENCY:0];      // 주소 지연
     reg activeArea_delayed [PIPE_LATENCY:0];            // 활성 영역 지연
-    reg [7:0] red_value_delayed [PIPE_LATENCY:0];       // 빨간색 지연
-    reg [7:0] green_value_delayed [PIPE_LATENCY:0];     // 초록색 지연
-    reg [7:0] blue_value_delayed [PIPE_LATENCY:0];      // 파란색 지연
+    reg [15:0] rddata_delayed [PIPE_LATENCY:0];         // RGB565 픽셀 데이터 지연
     reg [7:0] gray_value_delayed [PIPE_LATENCY:0];      // 그레이스케일 지연
     reg [7:0] sobel_value_delayed [PIPE_LATENCY:0];     // 소벨 지연
     reg [7:0] canny_value_delayed [PIPE_LATENCY:0];     // 캐니 지연
@@ -111,6 +109,8 @@ module digital_cam_top (
 
     // 배경 제거 출력을 위한 파이프라인
     reg [15:0] bg_sub_out_delayed [4:0];
+    reg adaptive_flag_delayed [PIPE_LATENCY:0];
+    wire  bg_load_active;
 
     // ============================================================================
     // 버튼 및 제어 로직
@@ -320,16 +320,14 @@ module digital_cam_top (
             for (i = 0; i <= PIPE_LATENCY; i = i + 1) begin
                 rdaddress_delayed[i] <= 17'd0;
                 activeArea_delayed[i] <= 1'b0;
-                red_value_delayed[i] <= 8'd0;
-                green_value_delayed[i] <= 8'd0;
-                blue_value_delayed[i] <= 8'd0;
+                rddata_delayed[i] <= 16'd0;
                 gray_value_delayed[i] <= 8'd0;
                 sobel_value_delayed[i] <= 8'd0;
                 canny_value_delayed[i] <= 8'd0;
                 filter_ready_delayed[i] <= 1'b0;
                 sobel_ready_delayed[i] <= 1'b0;
                 canny_ready_delayed[i] <= 1'b0;
-                adaptive_fg_flag_delayed[i] <= 1'b0;
+                adaptive_flag_delayed[i] <= 1'b0;
                 rddata_bg_delayed[i] <= 16'd0;
                 bg_load_active_delayed[i] <= 1'b0;
             end
@@ -337,16 +335,14 @@ module digital_cam_top (
             // 0단계 (정렬 기준 d2)
             rdaddress_delayed[0] <= rdaddress_d2;
             activeArea_delayed[0] <= activeArea_d2;
-            red_value_delayed[0] <= red_value;
-            green_value_delayed[0] <= green_value;
-            blue_value_delayed[0] <= blue_value;
+            rddata_delayed[0] <= rddata;
             gray_value_delayed[0] <= gray_value;
             sobel_value_delayed[0] <= sobel_value;
             canny_value_delayed[0] <= canny_value;
             filter_ready_delayed[0] <= filter_ready;
             sobel_ready_delayed[0] <= sobel_ready;
             canny_ready_delayed[0] <= canny_ready;
-            adaptive_fg_flag_delayed[0] <= adaptive_fg_flag;
+            adaptive_flag_delayed[0] <= adaptive_fg_flag;
             rddata_bg_delayed[0] <= rddata_bg;
             bg_load_active_delayed[0] <= bg_load_active;
             
@@ -354,16 +350,14 @@ module digital_cam_top (
             for (i = 1; i <= PIPE_LATENCY; i = i + 1) begin
                 rdaddress_delayed[i] <= rdaddress_delayed[i-1];
                 activeArea_delayed[i] <= activeArea_delayed[i-1];
-                red_value_delayed[i] <= red_value_delayed[i-1];
-                green_value_delayed[i] <= green_value_delayed[i-1];
-                blue_value_delayed[i] <= blue_value_delayed[i-1];
+                rddata_delayed[i] <= rddata_delayed[i-1];
                 gray_value_delayed[i] <= gray_value_delayed[i-1];
                 sobel_value_delayed[i] <= sobel_value_delayed[i-1];
                 canny_value_delayed[i] <= canny_value_delayed[i-1];
                 filter_ready_delayed[i] <= filter_ready_delayed[i-1];
                 sobel_ready_delayed[i] <= sobel_ready_delayed[i-1];
                 canny_ready_delayed[i] <= canny_ready_delayed[i-1];
-                adaptive_fg_flag_delayed[i] <= adaptive_fg_flag_delayed[i-1];
+                adaptive_flag_delayed[i] <= adaptive_flag_delayed[i-1];
                 rddata_bg_delayed[i] <= rddata_bg_delayed[i-1];
                 bg_load_active_delayed[i] <= bg_load_active_delayed[i-1];
             end
@@ -413,34 +407,11 @@ module digital_cam_top (
     assign rddata = rdaddress_d2[16] ? rddata_ram2 : rddata_ram1;
     assign rddata_bg = rdaddress_d2[16] ? rddata_bg_ram2 : rddata_bg_ram1;
 
-    // --- Dynamic Threshold Logic ---
-    // 1. Convert background pixel from RGB565 to RGB888
-    wire [7:0] bg_r_888, bg_g_888, bg_b_888;
-    assign bg_r_888 = {rddata_bg[15:11], 3'b111};
-    assign bg_g_888 = {rddata_bg[10:5],  2'b11};
-    assign bg_b_888 = {rddata_bg[4:0],   3'b111};
-
-    // 2. Calculate Luma (brightness) of the background pixel
-    wire [7:0] bg_luma;
-    wire [16:0] bg_gray_sum;
-    assign bg_gray_sum = (bg_r_888 << 6) + (bg_r_888 << 3) + (bg_r_888 << 2) +
-                         (bg_g_888 << 7) + (bg_g_888 << 4) + (bg_g_888 << 2) + (bg_g_888 << 1) +
-                         (bg_b_888 << 4) + (bg_b_888 << 3) + (bg_b_888 << 1);
-    assign bg_luma = activeArea_aligned ? bg_gray_sum[16:8] : 8'h00;
-
-    // 3. Calculate dynamic threshold
-    // Threshold = (Luma / 2) + Base_Threshold_from_IR_Remote
-    wire [8:0] dynamic_threshold = (bg_luma >> 1) + bg_sub_threshold_btn;
-    // --- End of Dynamic Threshold Logic ---
-
     // RGB565 → RGB888 변환
     wire [7:0] r_888, g_888, b_888;
     assign r_888 = {rddata[15:11], 3'b111};
     assign g_888 = {rddata[10:5], 2'b11};
     assign b_888 = {rddata[4:0], 3'b111};
-
-    // RGB888을 하나의 24비트 픽셀로 결합
-    wire [23:0] rgb888_pixel = {r_888, g_888, b_888};
 
     // 그레이스케일 계산
     wire [16:0] gray_sum;
@@ -448,11 +419,6 @@ module digital_cam_top (
                      (g_888 << 7) + (g_888 << 4) + (g_888 << 2) + (g_888 << 1) +
                      (b_888 << 4) + (b_888 << 3) + (b_888 << 1);
     assign gray_value = activeArea_aligned ? gray_sum[16:8] : 8'h00;
-
-    // 색상 값들
-    assign red_value = activeArea_aligned ? r_888 : 8'h00;
-    assign green_value = activeArea_aligned ? g_888 : 8'h00;
-    assign blue_value = activeArea_aligned ? b_888 : 8'h00;
 
     // ============================================================================
     // 이미지 처리 모듈 인스턴스
@@ -534,13 +500,48 @@ module digital_cam_top (
         .is_target_out(color_track_out)
     );
 
+    assign bg_load_active = ~vga_enable_reg; // Automatically capture first frame
+
+    // The blurred gray output is 8-bit. Convert to 16-bit RGB565 format for the adaptive_bg module.
+    wire [15:0] blurred_pixel_for_bg;
+    assign blurred_pixel_for_bg = {gray_blur[7:3], gray_blur[7:2], gray_blur[7:3]};
+
+    adaptive_background #(
+        .ADDR_WIDTH(17),
+        .PIXEL_WIDTH(16),
+        .SHIFT_LG2(4),
+        .FG_SHIFT_LG2(8)
+    ) adaptive_bg_inst (
+        .clk(clk_25_vga),
+        .rst(1'b0),
+        .enable(1'b1),
+        .addr_in(rdaddress_delayed[GAUSS_LAT]),
+        .live_pixel_in(blurred_pixel_for_bg),      
+        .bg_pixel_in(rddata_bg_delayed[GAUSS_LAT]), 
+        .active_in(activeArea_delayed[GAUSS_LAT]),
+        .load_frame(bg_load_active_delayed[GAUSS_LAT]), 
+        .threshold_in(bg_sub_threshold_btn), 
+        .bg_wr_addr(bg_wr_addr),
+        .bg_wr_data(bg_wr_data),
+        .bg_wr_en(bg_wr_en),
+        .fg_pixel_out(bg_sub_out),
+        .foreground_flag(adaptive_flag)
+    );
+
+    
+
     // ============================================================================
     // 출력 선택 및 VGA 연결
     // ============================================================================
     // 최종 출력 선택
-    wire [7:0] sel_orig_r = activeArea_delayed[IDX_ORIG] ? red_value_delayed[IDX_ORIG] : 8'h00;
-    wire [7:0] sel_orig_g = activeArea_delayed[IDX_ORIG] ? green_value_delayed[IDX_ORIG] : 8'h00;
-    wire [7:0] sel_orig_b = activeArea_delayed[IDX_ORIG] ? blue_value_delayed[IDX_ORIG] : 8'h00;
+    wire [15:0] sel_rddata_orig = rddata_delayed[IDX_ORIG];
+    wire [7:0] sel_r_888 = {sel_rddata_orig[15:11], 3'b111};
+    wire [7:0] sel_g_888 = {sel_rddata_orig[10:5],  2'b11};
+    wire [7:0] sel_b_888 = {sel_rddata_orig[4:0],   3'b111};
+
+    wire [7:0] sel_orig_r = activeArea_delayed[IDX_ORIG] ? sel_r_888 : 8'h00;
+    wire [7:0] sel_orig_g = activeArea_delayed[IDX_ORIG] ? sel_g_888 : 8'h00;
+    wire [7:0] sel_orig_b = activeArea_delayed[IDX_ORIG] ? sel_b_888 : 8'h00;
     wire [7:0] sel_gray = activeArea_delayed[IDX_GRAY] ? gray_value_delayed[IDX_GRAY] : 8'h00;
     wire [7:0] sel_sobel = (activeArea_delayed[IDX_SOBEL] && sobel_ready_delayed[IDX_SOBEL]) ? sobel_value_delayed[IDX_SOBEL] : 8'h00;
     wire [7:0] sel_canny = (activeArea_delayed[IDX_CANNY] && canny_ready_delayed[IDX_CANNY]) ? canny_value_delayed[IDX_CANNY] : 8'h00;
@@ -578,10 +579,6 @@ module digital_cam_top (
     wire [7:0] sel_bg_sub_g = {bg_sub_out_delayed[4][10:5],  2'b11};
     wire [7:0] sel_bg_sub_b = {bg_sub_out_delayed[4][4:0],   3'b111};
 
-    // 배경 제거 플래그 지연
-    reg adaptive_fg_flag_delayed [PIPE_LATENCY:0];
-    // This flag's pipeline is now integrated into the main pipeline block for synchronization.
-
     // 스위치 로직
     reg [7:0] final_r, final_g, final_b;
     always @(*) begin
@@ -612,7 +609,7 @@ module digital_cam_top (
                 final_b = sel_colortrack_b;
             end
             MODE_BG_SUB: begin
-                if (adaptive_fg_flag_delayed[IDX_ORIG - 4]) begin // adaptive_bg_inst 모듈의 4클럭 지연 보상
+                if (adaptive_flag_delayed[IDX_ORIG - 4]) begin // adaptive_bg_inst 모듈의 4클럭 지연 보상
                     // 전경: 원본 색상 출력
                     final_r = sel_orig_r;
                     final_g = sel_orig_g;
@@ -638,49 +635,10 @@ module digital_cam_top (
     assign vga_b = (vga_enable && activeArea_delayed[IDX_ORIG]) ? final_b : 8'h00;
 
     // ============================================================================
-    // 외부 모듈 인스턴스
-    // ============================================================================
-    // ============================================================================
     // 적응형 배경제거 모듈
     // ============================================================================
-    reg  bg_load_active = 1'b0;
 
-    // On the first frame after reset/startup, load it as the initial background.
-    // This signal stays high until the first VSYNC, then goes low.
-    always @(posedge clk_25_vga) begin
-        if (!frame_ready_sync2) begin
-            bg_load_active <= 1'b1; // Initialize background on first frame
-        end else if (!vsync_prev_display && vsync_raw) begin // De-assert at the start of the next frame
-            bg_load_active <= 1'b0;
-        end
-    end
 
-    // The blurred gray output is 8-bit. Convert to 16-bit RGB565 format for the adaptive_bg module.
-    wire [15:0] blurred_pixel_for_bg;
-    assign blurred_pixel_for_bg = {gray_blur[7:3], gray_blur[7:2], gray_blur[7:3]};
-
-    adaptive_background #(
-        .ADDR_WIDTH(17),
-        .PIXEL_WIDTH(16),
-        .SHIFT_LG2(4),
-        .FG_SHIFT_LG2(8)
-    ) adaptive_bg_inst (
-        .clk(clk_25_vga),
-        .rst(1'b0),
-        .enable(1'b1),
-        // Connect signals delayed by Gaussian filter latency
-        .addr_in(rdaddress_delayed[GAUSS_LAT]),
-        .live_pixel_in(blurred_pixel_for_bg),      // Use blurred data
-        .bg_pixel_in(rddata_bg_delayed[GAUSS_LAT]), // Use delayed background data
-        .active_in(activeArea_delayed[GAUSS_LAT]),
-        .load_frame(bg_load_active_delayed[GAUSS_LAT]), // Use delayed load signal
-        .threshold_in(bg_sub_threshold_btn), // Connect the adjustable threshold
-        .bg_wr_addr(bg_wr_addr),
-        .bg_wr_data(bg_wr_data),
-        .bg_wr_en(bg_wr_en),
-        .fg_pixel_out(bg_sub_out),
-        .foreground_flag(adaptive_fg_flag)
-    );
 
     // PLL 인스턴스
     my_altpll pll_inst (
