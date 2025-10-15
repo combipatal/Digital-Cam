@@ -692,12 +692,10 @@ module digital_cam_top (
     // VGA 컨트롤러
     vga_640 vga_inst (
         .CLK25(clk_25_vga),
-        .pixel_data(rddata),
         .clkout(vga_CLK),
         .Hsync(hsync_raw),
         .Vsync(vsync_raw),
         .Nblank(vga_blank_N_raw), 
-        .Nsync(vga_sync_N_raw),
         .activeArea(activeArea), 
         .pixel_address(rdaddress)
     );
@@ -706,7 +704,7 @@ module digital_cam_top (
     assign vga_hsync = hsync_raw;
     assign vga_vsync = vsync_raw;
     assign vga_blank_N = vga_blank_N_raw;
-    assign vga_sync_N = vga_sync_N_raw;
+    assign vga_sync_N = 1'b1;
 
     // OV7670 카메라 컨트롤러
     ov7670_controller camera_ctrl (
