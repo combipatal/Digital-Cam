@@ -83,33 +83,19 @@ module vga_640 (
     // clkout: 입력 클럭을 그대로 DAC 클럭으로 사용
     assign clkout = CLK25;
     
-    // activeArea: video_active 신호를 레지스터에 저장하여 안정적으로 사용
-    always @(posedge CLK25) begin
-        activeArea <= video_active;
-    end
-
-    // =================================================================================
-    // 프레임 버퍼 주소 계산 로직 (320x240 소스 -> 640x480 출력)
-    // =================================================================================
     // 640x480 화면 좌표(Hcnt, Vcnt)를 320x240 소스 좌표(src_x, src_y)로 변환
-    // Nearest Neighbour 업스케일링을 위해 단순히 좌표를 2로 나눔 (오른쪽으로 1비트 시프트)
     wire [8:0] src_x = Hcnt[9:1];      // 640 -> 320 (0..319)
     wire [8:0] src_y = Vcnt[9:1];      // 480 -> 240 (0..239)
 
     // 1차원 배열인 프레임 버퍼의 주소를 계산: address = (y * 너비) + x
-    // 너비가 320이므로, (src_y * 320) + src_x 를 계산.
-    // 곱셈은 하드웨어에서 비효율적이므로 시프트와 덧셈으로 구현.
-    // src_y * 320 = src_y * (256 + 64) = (src_y << 8) + (src_y << 6)
     wire [16:0] line_base = {src_y, 8'b0} + {src_y, 6'b0};
     
     // HACK: 시스템의 다른 부분에 존재하는 알 수 없는 -1 오프셋으로 인해 발생하는
     // 화면 깨짐 현상을 보정하기 위해 주소에 1을 더함. 이는 증상을 해결하기 위한 임시방편.
     wire [16:0] addr_next = line_base + {8'b0, src_x} + 17'd1;
-
-    // --- 최종 주소 레지스터 ---
-    // 계산된 주소(addr_next)를 레지스터에 저장.
-    // 유효 영상 구간(video_active)일 때만 주소를 업데이트하고, 그 외에는 0으로 초기화.
+    
     always @(posedge CLK25) begin
+        activeArea <= video_active;
         if (video_active)
             pixel_address <= addr_next;
         else

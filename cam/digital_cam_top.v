@@ -31,14 +31,10 @@ module digital_cam_top (
     // ============================================================================
     localparam integer MEM_RD_LAT = 2;           // 메모리 읽기 지연
     localparam integer GAUSS_LAT = 2;             // 가우시안 필터 지연
-    localparam integer SOBEL_EXTRA_LAT = 5;       // 소벨 실제 지연 (3x3 윈도우 + 그래디언트 + 크기 + 임계값)
-    localparam integer PIPE_LATENCY = GAUSS_LAT + SOBEL_EXTRA_LAT; // 7클럭 (가우시안 + 소벨)
+    localparam integer SOBEL_LAT = 5;       // 소벨 실제 지연 (3x3 윈도우 + 그래디언트 + 크기 + 임계값)
+    localparam integer PIPE_LATENCY = GAUSS_LAT + SOBEL_LAT; // 7클럭 (가우시안 + 소벨)
     
-    // 경로별 지연 인덱스
-    localparam integer IDX_ORIG  = PIPE_LATENCY;  // 원본: 7클럭
-    localparam integer IDX_GRAY  = PIPE_LATENCY;  // 그레이스케일: 7클럭
-    localparam integer IDX_SOBEL = PIPE_LATENCY;  // 소벨: 7클럭
-    localparam integer IDX_CANNY = PIPE_LATENCY;  // 캐니: 7클럭
+    // 경로별 지연은 현재 모두 PIPE_LATENCY(7클럭)로 동일하게 사용
 
     // ============================================================================
     // 클럭 및 기본 신호
@@ -71,6 +67,9 @@ module digital_cam_top (
     wire vga_blank_N_raw;
     wire vga_sync_N_raw;
     wire vga_enable;         // VGA 출력 활성화 신호
+    // VGA 즉시 출력 신호를 2클럭 지연시키기 위한 레지스터들 (파이프라인 기준 d2)
+    reg [16:0] rdaddress_d1, rdaddress_d2;
+    reg activeArea_d1, activeArea_d2;
 
     // ============================================================================
     // 이미지 처리 신호
@@ -90,7 +89,6 @@ module digital_cam_top (
     wire color_track_valid;
     reg color_track_out_d1;
 
-    
     // Reset signal for VGA domain (active low)
     wire rst_n_vga_domain = 1'b1;  // 항상 활성화 (리셋 해제)
 
@@ -99,16 +97,8 @@ module digital_cam_top (
     reg activeArea_delayed [PIPE_LATENCY:0];            // 활성 영역 지연
     reg [15:0] rddata_delayed [PIPE_LATENCY:0];         // RGB565 픽셀 데이터 지연
     reg [7:0] gray_value_delayed [PIPE_LATENCY:0];      // 그레이스케일 지연
-    reg [7:0] sobel_value_delayed [PIPE_LATENCY:0];     // 소벨 지연
-    reg [7:0] canny_value_delayed [PIPE_LATENCY:0];     // 캐니 지연
-    reg filter_ready_delayed [PIPE_LATENCY:0];          // 필터 준비 지연
-    reg sobel_ready_delayed [PIPE_LATENCY:0];           // 소벨 준비 지연
-    reg canny_ready_delayed [PIPE_LATENCY:0];           // 캐니 준비 지연
     reg [15:0] rddata_bg_delayed [PIPE_LATENCY:0];      // 배경 픽셀 데이터 지연
     reg bg_load_active_delayed [PIPE_LATENCY:0];        // 배경 로드 신호 지연
-
-    // 배경 제거 출력을 위한 파이프라인
-    reg [15:0] bg_sub_out_delayed [4:0];
     reg adaptive_flag_delayed [PIPE_LATENCY:0];
     wire  bg_load_active;
 
@@ -121,8 +111,6 @@ module digital_cam_top (
     reg btn_pressed_prev = 1'b0;
     wire btn_rising_edge;
 
-
-
     // IR Control Logic
     // Key Codes
     localparam KEY_A    = 8'h0F;
@@ -133,10 +121,10 @@ module digital_cam_top (
     localparam KEY_3    = 8'h03; // Blue
     localparam KEY_UP   = 8'h1A;
     localparam KEY_DOWN = 8'h1E;
-    localparam KEY_ORIG = 8'h12; // Using 'OK' button for original mode
+    localparam KEY_ORIG = 8'h12; 
     localparam KEY_BG_MODE    = 8'h04;
-    localparam KEY_BG_THR_UP  = 8'h1B; // New key for increasing BG threshold
-    localparam KEY_BG_THR_DOWN= 8'h1F; // New key for decreasing BG threshold
+    localparam KEY_BG_THR_UP  = 8'h1B; 
+    localparam KEY_BG_THR_DOWN= 8'h1F;
 
     // Filter mode state register
     localparam MODE_ORIG  = 3'd0;
@@ -144,7 +132,7 @@ module digital_cam_top (
     localparam MODE_SOBEL = 3'd2;
     localparam MODE_CANNY = 3'd3;
     localparam MODE_COLOR = 3'd4;
-    localparam MODE_BG_SUB = 3'd5; // 배경 제거 모드
+    localparam MODE_BG_SUB = 3'd5; 
 
     reg [2:0] active_filter_mode = MODE_ORIG;
     reg [1:0] color_track_select = 2'b00; // 00:Red, 01:Green, 10:Blue
@@ -152,9 +140,7 @@ module digital_cam_top (
     // Background subtraction threshold, adjustable via IR remote
     reg [8:0] bg_sub_threshold_btn = 9'd40;
 
-
     // Adaptive background signals
-    wire [15:0] bg_sub_out;
     wire        adaptive_fg_flag;
     wire [15:0] rddata_bg;
     wire [15:0] rddata_bg_ram1, rddata_bg_ram2;
@@ -164,7 +150,6 @@ module digital_cam_top (
     wire [15:0] bg_wraddress_ram1;
     wire [15:0] bg_wraddress_ram2;
     wire        wren_bg_ram1, wren_bg_ram2;
-
 
     // IR Receiver outputs
     wire [7:0] ir_code;
@@ -233,12 +218,6 @@ module digital_cam_top (
     reg vsync_prev_display = 1'b1;
 
     // ============================================================================
-    // 메모리 지연 보정 로직 (RAM 2클럭)
-    // ============================================================================
-    reg activeArea_d1 = 1'b0, activeArea_d2 = 1'b0;
-    reg [16:0] rdaddress_d1 = 17'd0, rdaddress_d2 = 17'd0;
-
-    // ============================================================================
     // 버튼 디바운싱 로직
     // ============================================================================
     // 카메라 리셋 버튼
@@ -254,8 +233,6 @@ module digital_cam_top (
         end
         btn_pressed_prev <= btn_pressed;
     end
-
-
 
     // Sobel & Background Subtraction Threshold Adjustment
     always @(posedge clk_50) begin
@@ -298,77 +275,56 @@ module digital_cam_top (
     end
 
     // ============================================================================
-    // 메모리 지연 보정
+    // 파이프라인 기준 신호 2클럭 지연 생성 (RAM 읽기 지연 보상용 d2)
     // ============================================================================
     always @(posedge clk_25_vga) begin
+        rdaddress_d1 <= rdaddress;
+        rdaddress_d2 <= rdaddress_d1;
         activeArea_d1 <= activeArea;
         activeArea_d2 <= activeArea_d1;
-        rdaddress_d1  <= rdaddress;
-        rdaddress_d2  <= rdaddress_d1;
     end
 
     // ============================================================================
     // 파이프라인 정렬
     // ============================================================================
     integer i;
-    always @(posedge clk_25_vga) begin  // Delay for color tracker output to align with main pipeline
-        color_track_out_d1 <= color_track_out;
-
-        if (vsync_raw == 1'b0) begin
-            // 프레임 시작 시 모든 지연 레지스터 클리어
-      
-            for (i = 0; i <= PIPE_LATENCY; i = i + 1) begin
-                rdaddress_delayed[i] <= 17'd0;
-                activeArea_delayed[i] <= 1'b0;
-                rddata_delayed[i] <= 16'd0;
-                gray_value_delayed[i] <= 8'd0;
-                sobel_value_delayed[i] <= 8'd0;
-                canny_value_delayed[i] <= 8'd0;
-                filter_ready_delayed[i] <= 1'b0;
-                sobel_ready_delayed[i] <= 1'b0;
-                canny_ready_delayed[i] <= 1'b0;
-                adaptive_flag_delayed[i] <= 1'b0;
-                rddata_bg_delayed[i] <= 16'd0;
-                bg_load_active_delayed[i] <= 1'b0;
-            end
-        end else begin
-            // 0단계 (정렬 기준 d2)
-            rdaddress_delayed[0] <= rdaddress_d2;
-            activeArea_delayed[0] <= activeArea_d2;
-            rddata_delayed[0] <= rddata;
-            gray_value_delayed[0] <= gray_value;
-            sobel_value_delayed[0] <= sobel_value;
-            canny_value_delayed[0] <= canny_value;
-            filter_ready_delayed[0] <= filter_ready;
-            sobel_ready_delayed[0] <= sobel_ready;
-            canny_ready_delayed[0] <= canny_ready;
-            adaptive_flag_delayed[0] <= adaptive_fg_flag;
-            rddata_bg_delayed[0] <= rddata_bg;
-            bg_load_active_delayed[0] <= bg_load_active;
-            
-            // 1-PIPE_LATENCY 단계 지연 체인
-            for (i = 1; i <= PIPE_LATENCY; i = i + 1) begin
-                rdaddress_delayed[i] <= rdaddress_delayed[i-1];
-                activeArea_delayed[i] <= activeArea_delayed[i-1];
-                rddata_delayed[i] <= rddata_delayed[i-1];
-                gray_value_delayed[i] <= gray_value_delayed[i-1];
-                sobel_value_delayed[i] <= sobel_value_delayed[i-1];
-                canny_value_delayed[i] <= canny_value_delayed[i-1];
-                filter_ready_delayed[i] <= filter_ready_delayed[i-1];
-                sobel_ready_delayed[i] <= sobel_ready_delayed[i-1];
-                canny_ready_delayed[i] <= canny_ready_delayed[i-1];
-                adaptive_flag_delayed[i] <= adaptive_flag_delayed[i-1];
-                rddata_bg_delayed[i] <= rddata_bg_delayed[i-1];
-                bg_load_active_delayed[i] <= bg_load_active_delayed[i-1];
-            end
-
-            // 배경 제거 출력 파이프라인
-            bg_sub_out_delayed[0] <= bg_sub_out;
-            for (i = 0; i < 4; i = i + 1) begin
-                bg_sub_out_delayed[i+1] <= bg_sub_out_delayed[i];
+        always @(posedge clk_25_vga) begin  // Delay for color tracker output to align with main pipeline
+            color_track_out_d1 <= color_track_out;
+    
+            if (vsync_raw == 1'b0) begin
+                // 프레임 시작 시 모든 지연 레지스터 클리어
+                for (i = 0; i <= PIPE_LATENCY; i = i + 1) begin
+                    rdaddress_delayed[i] <= 17'd0;
+                    activeArea_delayed[i] <= 1'b0;
+                    rddata_delayed[i] <= 16'd0;
+                    gray_value_delayed[i] <= 8'd0;
+                    adaptive_flag_delayed[i] <= 1'b0;
+                    rddata_bg_delayed[i] <= 16'd0;
+                    bg_load_active_delayed[i] <= 1'b0;
+                end
+            end else begin
+                // 0단계 (정렬 기준 d2)
+                rdaddress_delayed[0] <= rdaddress_d2;
+                activeArea_delayed[0] <= activeArea_d2;
+                rddata_delayed[0] <= rddata;
+                gray_value_delayed[0] <= gray_value;
+                adaptive_flag_delayed[0] <= adaptive_fg_flag;
+                rddata_bg_delayed[0] <= rddata_bg;
+                bg_load_active_delayed[0] <= bg_load_active;
+                
+                // 1-PIPE_LATENCY 단계 지연 체인
+                for (i = 1; i <= PIPE_LATENCY; i = i + 1) begin
+                    rdaddress_delayed[i] <= rdaddress_delayed[i-1];
+                    activeArea_delayed[i] <= activeArea_delayed[i-1];
+                    rddata_delayed[i] <= rddata_delayed[i-1];
+                    gray_value_delayed[i] <= gray_value_delayed[i-1];
+                    adaptive_flag_delayed[i] <= adaptive_flag_delayed[i-1];
+                    rddata_bg_delayed[i] <= rddata_bg_delayed[i-1];
+                    bg_load_active_delayed[i] <= bg_load_active_delayed[i-1];
+                end
+    
             end
         end
-    end
 
     // ============================================================================
     // 신호 연결 및 데이터 변환
@@ -398,7 +354,7 @@ module digital_cam_top (
     assign wren_bg_ram1 = bg_wr_en & ~bg_wr_addr[16];
     assign wren_bg_ram2 = bg_wr_en &  bg_wr_addr[16];
 
-    // 읽기 주소 할당 (RAM에는 rdaddress 직접 입력 → RAM 2클럭 후 d2와 정렬)
+    // 읽기 주소 할당 (RAM에는 지연 없는 rdaddress를 직접 입력)
     assign rdaddress_ram1 = rdaddress[15:0];
     wire [16:0] rdaddr_sub = rdaddress - 17'd65536;
     assign rdaddress_ram2 = rdaddr_sub[15:0];
@@ -524,27 +480,24 @@ module digital_cam_top (
         .bg_wr_addr(bg_wr_addr),
         .bg_wr_data(bg_wr_data),
         .bg_wr_en(bg_wr_en),
-        .fg_pixel_out(bg_sub_out),
-        .foreground_flag(adaptive_flag)
+        .foreground_flag(adaptive_fg_flag)
     );
-
-    
 
     // ============================================================================
     // 출력 선택 및 VGA 연결
     // ============================================================================
     // 최종 출력 선택
-    wire [15:0] sel_rddata_orig = rddata_delayed[IDX_ORIG];
+    wire [15:0] sel_rddata_orig = rddata_delayed[PIPE_LATENCY];
     wire [7:0] sel_r_888 = {sel_rddata_orig[15:11], 3'b111};
     wire [7:0] sel_g_888 = {sel_rddata_orig[10:5],  2'b11};
     wire [7:0] sel_b_888 = {sel_rddata_orig[4:0],   3'b111};
 
-    wire [7:0] sel_orig_r = activeArea_delayed[IDX_ORIG] ? sel_r_888 : 8'h00;
-    wire [7:0] sel_orig_g = activeArea_delayed[IDX_ORIG] ? sel_g_888 : 8'h00;
-    wire [7:0] sel_orig_b = activeArea_delayed[IDX_ORIG] ? sel_b_888 : 8'h00;
-    wire [7:0] sel_gray = activeArea_delayed[IDX_GRAY] ? gray_value_delayed[IDX_GRAY] : 8'h00;
-    wire [7:0] sel_sobel = (activeArea_delayed[IDX_SOBEL] && sobel_ready_delayed[IDX_SOBEL]) ? sobel_value_delayed[IDX_SOBEL] : 8'h00;
-    wire [7:0] sel_canny = (activeArea_delayed[IDX_CANNY] && canny_ready_delayed[IDX_CANNY]) ? canny_value_delayed[IDX_CANNY] : 8'h00;
+    wire [7:0] sel_orig_r = activeArea_delayed[PIPE_LATENCY] ? sel_r_888 : 8'h00;
+    wire [7:0] sel_orig_g = activeArea_delayed[PIPE_LATENCY] ? sel_g_888 : 8'h00;
+    wire [7:0] sel_orig_b = activeArea_delayed[PIPE_LATENCY] ? sel_b_888 : 8'h00;
+    wire [7:0] sel_gray = activeArea_delayed[PIPE_LATENCY] ? gray_value_delayed[PIPE_LATENCY] : 8'h00;
+    wire [7:0] sel_sobel = (activeArea_delayed[PIPE_LATENCY] && sobel_ready) ? sobel_value : 8'h00;
+    wire [7:0] sel_canny = (activeArea_delayed[PIPE_LATENCY] && canny_ready) ? canny_value : 8'h00;
     
     // Define color for the tracking output mask
     // 추적된 픽셀을 해당 색상으로 표시
@@ -574,10 +527,7 @@ module digital_cam_top (
         endcase
     end
 
-    // Background subtraction output (RGB565 -> RGB888)
-    wire [7:0] sel_bg_sub_r = {bg_sub_out_delayed[4][15:11], 3'b111};
-    wire [7:0] sel_bg_sub_g = {bg_sub_out_delayed[4][10:5],  2'b11};
-    wire [7:0] sel_bg_sub_b = {bg_sub_out_delayed[4][4:0],   3'b111};
+
 
     // 스위치 로직
     reg [7:0] final_r, final_g, final_b;
@@ -609,7 +559,7 @@ module digital_cam_top (
                 final_b = sel_colortrack_b;
             end
             MODE_BG_SUB: begin
-                if (adaptive_flag_delayed[IDX_ORIG - 4]) begin // adaptive_bg_inst 모듈의 4클럭 지연 보상
+                if (adaptive_flag_delayed[1]) begin // Total latency: 6 (flag gen) + 1 (delay) = 7 clocks
                     // 전경: 원본 색상 출력
                     final_r = sel_orig_r;
                     final_g = sel_orig_g;
@@ -629,16 +579,9 @@ module digital_cam_top (
         endcase
     end
 
-    // activeArea_aligned 대신 파이프라인 최종단에 정렬된 activeArea_delayed[IDX_ORIG] 사용
-    assign vga_r = (vga_enable && activeArea_delayed[IDX_ORIG]) ? final_r : 8'h00;
-    assign vga_g = (vga_enable && activeArea_delayed[IDX_ORIG]) ? final_g : 8'h00;
-    assign vga_b = (vga_enable && activeArea_delayed[IDX_ORIG]) ? final_b : 8'h00;
-
-    // ============================================================================
-    // 적응형 배경제거 모듈
-    // ============================================================================
-
-
+    assign vga_r = (vga_enable && activeArea_delayed[PIPE_LATENCY]) ? final_r : 8'h00;
+    assign vga_g = (vga_enable && activeArea_delayed[PIPE_LATENCY]) ? final_g : 8'h00;
+    assign vga_b = (vga_enable && activeArea_delayed[PIPE_LATENCY]) ? final_b : 8'h00;
 
     // PLL 인스턴스
     my_altpll pll_inst (
@@ -647,7 +590,7 @@ module digital_cam_top (
         .c1(clk_25_vga)
     );
 
-    // VGA 컨트롤러
+    // VGA 컨트롤러 (지연 없는 주소/active 출력)
     vga_640 vga_inst (
         .CLK25(clk_25_vga),
         .clkout(vga_CLK),
