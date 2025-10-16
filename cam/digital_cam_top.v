@@ -140,7 +140,7 @@ module digital_cam_top (
     // Background subtraction threshold, adjustable via IR remote
     reg [8:0] bg_sub_threshold_btn = 9'd40;
 
-    // Adaptive background signals
+    // Adaptive background signals 혁바오야 고마워
     wire        adaptive_fg_flag;
     wire [15:0] rddata_bg;
     wire [15:0] rddata_bg_ram1, rddata_bg_ram2;
@@ -151,12 +151,12 @@ module digital_cam_top (
     wire [15:0] bg_wraddress_ram2;
     wire        wren_bg_ram1, wren_bg_ram2;
 
-    // IR Receiver outputs
+    // IR Receiver outputs 방구
     wire [7:0] ir_code;
     wire ir_valid;
     wire rst_n_50m;
 
-    // IR command pulses
+    // IR command pulses 머래는겨 ㅋㅋ
     reg ir_up_pulse = 1'b0;
     reg ir_down_pulse = 1'b0;
     reg ir_bg_thr_up_pulse = 1'b0;
@@ -164,7 +164,7 @@ module digital_cam_top (
 
     assign rst_n_50m = ~btn_pressed; // Active low reset from debounced button
 
-    // Instantiate IR Receiver
+    // Instantiate IR Receiver 똥
     IR_RECEVER ir_inst (
         .clk(clk_50),
         .rst_n(rst_n_50m),
@@ -173,7 +173,7 @@ module digital_cam_top (
         .data_valid(ir_valid)
     );
 
-    // IR Command Decoder
+    // IR Command Decoder 제 눈 낫게 해주세요
     always @(posedge clk_50) begin
         // Pulses are active for one cycle
         ir_up_pulse <= 1'b0;
@@ -559,7 +559,13 @@ module digital_cam_top (
                 final_b = sel_colortrack_b;
             end
             MODE_BG_SUB: begin
-                if (adaptive_flag_delayed[1]) begin // Total latency: 6 (flag gen) + 1 (delay) = 7 clocks
+                // adaptive_fg_flag 파이프라인 정렬:
+                //   - adaptive_bg_inst 입력: rdaddress_delayed[2] (GAUSS_LAT)
+                //   - adaptive_bg_inst 지연: 4 클럭 (리팩토링으로 4클럭으로 수정됨)
+                //   - adaptive_fg_flag 생성 시점: 2(입력) + 4(모듈) = 6 클럭
+                //   - adaptive_flag_delayed[1] 최종 사용 시점: 6 + 1 = 7 클럭
+                //   - 최종 데이터(sel_orig_r 등) 출력 시점: PIPE_LATENCY = 7 클럭. 타이밍 일치.
+                if (adaptive_flag_delayed[1]) begin 
                     // 전경: 원본 색상 출력
                     final_r = sel_orig_r;
                     final_g = sel_orig_g;
