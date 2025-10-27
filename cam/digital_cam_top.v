@@ -140,23 +140,23 @@ module digital_cam_top (
     // Background subtraction threshold, adjustable via IR remote
     reg [8:0] bg_sub_threshold_btn = 9'd40;
 
-    // Adaptive background signals 혁바오야 고마워
+    // Adaptive background signals
     wire        adaptive_fg_flag;
-    wire [15:0] rddata_bg;
-    wire [15:0] rddata_bg_ram1, rddata_bg_ram2;
+    wire [7:0]  rddata_bg;
+    wire [7:0]  rddata_bg_ram1, rddata_bg_ram2;
     wire [16:0] bg_wr_addr;
-    wire [15:0] bg_wr_data;
+    wire [7:0]  bg_wr_data;
     wire        bg_wr_en;
     wire [15:0] bg_wraddress_ram1;
     wire [15:0] bg_wraddress_ram2;
     wire        wren_bg_ram1, wren_bg_ram2;
 
-    // IR Receiver outputs 방구
+    // IR Receiver outputs
     wire [7:0] ir_code;
     wire ir_valid;
     wire rst_n_50m;
 
-    // IR command pulses 머래는겨 ㅋㅋ
+    // IR command pulses
     reg ir_up_pulse = 1'b0;
     reg ir_down_pulse = 1'b0;
     reg ir_bg_thr_up_pulse = 1'b0;
@@ -164,7 +164,7 @@ module digital_cam_top (
 
     assign rst_n_50m = ~btn_pressed; // Active low reset from debounced button
 
-    // Instantiate IR Receiver 똥
+    // Instantiate IR Receiver
     IR_RECEVER ir_inst (
         .clk(clk_50),
         .rst_n(rst_n_50m),
@@ -173,7 +173,7 @@ module digital_cam_top (
         .data_valid(ir_valid)
     );
 
-    // IR Command Decoder 제 눈 낫게 해주세요
+    // IR Command Decoder
     always @(posedge clk_50) begin
         // Pulses are active for one cycle
         ir_up_pulse <= 1'b0;
@@ -299,7 +299,7 @@ module digital_cam_top (
                     rddata_delayed[i] <= 16'd0;
                     gray_value_delayed[i] <= 8'd0;
                     adaptive_flag_delayed[i] <= 1'b0;
-                    rddata_bg_delayed[i] <= 16'd0;
+                    rddata_bg_delayed[i] <= 8'd0;
                     bg_load_active_delayed[i] <= 1'b0;
                 end
             end else begin
@@ -458,13 +458,9 @@ module digital_cam_top (
 
     assign bg_load_active = ~vga_enable_reg; // Automatically capture first frame
 
-    // The blurred gray output is 8-bit. Convert to 16-bit RGB565 format for the adaptive_bg module.
-    wire [15:0] blurred_pixel_for_bg;
-    assign blurred_pixel_for_bg = {gray_blur[7:3], gray_blur[7:2], gray_blur[7:3]};
-
     adaptive_background #(
         .ADDR_WIDTH(17),
-        .PIXEL_WIDTH(16),
+        .PIXEL_WIDTH(8), // 8-bit Grayscale
         .SHIFT_LG2(4),
         .FG_SHIFT_LG2(8)
     ) adaptive_bg_inst (
@@ -472,7 +468,7 @@ module digital_cam_top (
         .rst(1'b0),
         .enable(1'b1),
         .addr_in(rdaddress_delayed[GAUSS_LAT]),
-        .live_pixel_in(blurred_pixel_for_bg),      
+        .live_pixel_in(gray_blur), // Connect 8-bit grayscale directly
         .bg_pixel_in(rddata_bg_delayed[GAUSS_LAT]), 
         .active_in(activeArea_delayed[GAUSS_LAT]),
         .load_frame(bg_load_active_delayed[GAUSS_LAT]), 
@@ -561,11 +557,11 @@ module digital_cam_top (
             MODE_BG_SUB: begin
                 // adaptive_fg_flag 파이프라인 정렬:
                 //   - adaptive_bg_inst 입력: rdaddress_delayed[2] (GAUSS_LAT)
-                //   - adaptive_bg_inst 지연: 4 클럭 (리팩토링으로 4클럭으로 수정됨)
-                //   - adaptive_fg_flag 생성 시점: 2(입력) + 4(모듈) = 6 클럭
-                //   - adaptive_flag_delayed[1] 최종 사용 시점: 6 + 1 = 7 클럭
+                //   - adaptive_bg_inst 지연: 3 클럭 (리팩토링으로 3클럭으로 수정됨)
+                //   - adaptive_fg_flag 생성 시점: 2(입력) + 3(모듈) = 5 클럭
+                //   - adaptive_flag_delayed[2] 최종 사용 시점: 5 + 2 = 7 클럭
                 //   - 최종 데이터(sel_orig_r 등) 출력 시점: PIPE_LATENCY = 7 클럭. 타이밍 일치.
-                if (adaptive_flag_delayed[1]) begin 
+                if (adaptive_flag_delayed[2]) begin 
                     // 전경: 원본 색상 출력
                     final_r = sel_orig_r;
                     final_g = sel_orig_g;
@@ -658,7 +654,7 @@ module digital_cam_top (
         .q(rddata_ram2)
     );
 
-    frame_buffer_ram bg_buffer_ram1 (
+    frame_buffer_ram_8bit bg_buffer_ram1 (
         .data(bg_wr_data),
         .wraddress(bg_wraddress_ram1),
         .wrclock(clk_25_vga),
@@ -668,7 +664,7 @@ module digital_cam_top (
         .q(rddata_bg_ram1)
     );
 
-    frame_buffer_ram_11k bg_buffer_ram2 (
+    frame_buffer_ram_11k_8bit bg_buffer_ram2 (
         .data(bg_wr_data),
         .wraddress(bg_wraddress_ram2[13:0]),
         .wrclock(clk_25_vga),
