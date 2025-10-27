@@ -17,7 +17,7 @@
 module adaptive_background #(
     parameter integer ADDR_WIDTH    = 17,   // 주소 버스 폭
     parameter integer PIXEL_WIDTH   = 8,    // 픽셀 데이터 폭 (Grayscale 8-bit)
-    parameter integer SHIFT_LG2     = 3,    // 배경 학습률 (1/2^3 = 1/8)
+    parameter integer SHIFT_LG2     = 4,    // 배경 학습률 (1/2^4 = 1/16)
     parameter integer FG_SHIFT_LG2  = 8     // 전경 학습률 (1/2^8 = 1/256)
 ) (
     // --- 시스템 신호 ---
