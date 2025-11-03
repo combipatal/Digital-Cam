@@ -9,14 +9,18 @@ reg [15:0] wrdata;
 reg [2:0] active_filter_mode;
 
 wire vga_enable;
+wire pixel_valid;
 
 reg [15:0] frame_mem [0:320*240-1]; // 320x240 프레임 메모리
 wire [7:0] sobel_value;
+wire [7:0] gaussian_value;
 wire [7:0] canny_value;
 
-wire filter_ready = vga_enable;
 wire sobel_ready;
+wire gaussian_ready;
 wire canny_ready;
+
+localparam [2:0] MODE_GAUSS = 3'd6;
 
 test_digital_cam_top test_digital_cam_top_inst (
     .clk_50MHz(clk_50MHz),
@@ -26,8 +30,11 @@ test_digital_cam_top test_digital_cam_top_inst (
     .wrdata(wrdata),
     .active_filter_mode(active_filter_mode), 
     .vga_enable(vga_enable),
+    .pixel_valid(pixel_valid),
     .sobel_value(sobel_value),
     .sobel_ready(sobel_ready),
+    .gaussian_value(gaussian_value),
+    .gaussian_ready(gaussian_ready),
     .canny_value(canny_value),
     .canny_ready(canny_ready)
 );
@@ -40,7 +47,7 @@ initial begin   //초기화
     wren = 0;
     wraddress = 0;
     wrdata = 0;
-    active_filter_mode = 3'd3; // Canny 필터 모드
+    active_filter_mode = MODE_GAUSS; // Gaussian 필터 모드
 end
 
 always #10 clk_50MHz = ~clk_50MHz;  // 50MHz 클럭 생성
@@ -65,7 +72,7 @@ integer px_fd; // 필터 결과 파일 디스크립터
 integer px_cnt = 0; // 픽셀 값 카운트
 
 initial begin
-    px_fd = $fopen( "C:/git/Verilog-HDL/cam/px_value_canny.hex", "w");
+    px_fd = $fopen( "C:/git/Verilog-HDL/cam/px_value_gaussian.hex", "w");
     if (px_fd == 0) begin
         $display("Failed to open px_value.hex file");
     end
@@ -75,11 +82,11 @@ end
 
 
 always @(posedge clk_25MHz) begin
-    if (!filter_ready && canny_ready && px_cnt < IDX_MAX) begin
-        $fwrite(px_fd, "%02h\n", canny_value); // 픽셀 값 쓰기
+    if (pixel_valid && px_cnt < IDX_MAX) begin
+        $fwrite(px_fd, "%02h\n", gaussian_value); // 픽셀 값 쓰기
         px_cnt <= px_cnt + 1; // 픽셀 값 카운트 증가
         if (px_cnt == IDX_MAX - 1) begin
-            $display("Pixel dump completed");
+            $display("Pixel dump completed (Gaussian)");
             $fclose(px_fd);
             $finish;
         end

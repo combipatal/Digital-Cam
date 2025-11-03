@@ -22,8 +22,11 @@ module test_digital_cam_top (
 
     input  wire [2:0]  active_filter_mode,
     output wire        vga_enable,         // VGA 출력 활성화 신호 노출
+    output wire        pixel_valid,        // 파이프라인 정렬된 활성 영역 플래그
     output wire [7:0]  sobel_value,        // 소벨 필터 값 (그레이스케일)
     output wire        sobel_ready,        // 소벨 결과 유효 플래그
+    output wire [7:0]  gaussian_value,     // 가우시안 필터 결과 (그레이스케일)
+    output wire        gaussian_ready,     // 가우시안 결과 유효 플래그
     output wire [7:0]  canny_value,        // 캐니 필터 결과 (이진)
     output wire        canny_ready         // 캐니 결과 유효 플래그
 );
@@ -73,6 +76,7 @@ module test_digital_cam_top (
     // 이미지 처리 신호
     // ============================================================================
     wire [7:0] gray_value;           // 그레이스케일 값
+    wire [7:0] gray_blur;            // 가우시안 필터 출력
     //wire [7:0] sobel_value;          // 소벨 필터 값 (그레이스케일)
     wire filter_ready;               // 필터 처리 완료 신호
 
@@ -91,6 +95,8 @@ module test_digital_cam_top (
     reg activeArea_delayed [PIPE_LATENCY:0];            // 활성 영역 지연
     reg [15:0] rddata_delayed [PIPE_LATENCY:0];         // RGB565 픽셀 데이터 지연
     reg [7:0] gray_value_delayed [PIPE_LATENCY:0];      // 그레이스케일 지연
+    reg [7:0] gray_blur_delayed [PIPE_LATENCY:0];       // 가우시안 필터 결과 지연
+    reg gaussian_ready_delayed [PIPE_LATENCY:0];        // 가우시안 유효 신호 지연
     reg [15:0] rddata_bg_delayed [PIPE_LATENCY:0];      // 배경 픽셀 데이터 지연
     reg bg_load_active_delayed [PIPE_LATENCY:0];        // 배경 로드 신호 지연
     reg adaptive_flag_delayed [PIPE_LATENCY:0];
@@ -127,6 +133,7 @@ module test_digital_cam_top (
     localparam MODE_CANNY = 3'd3;
     localparam MODE_COLOR = 3'd4;
     localparam MODE_BG_SUB = 3'd5; 
+    localparam MODE_GAUSS = 3'd6;
 
     //reg [2:0] active_filter_mode = MODE_ORIG;
     reg [1:0] color_track_select = 2'b00; // 00:Red, 01:Green, 10:Blue
@@ -293,6 +300,8 @@ module test_digital_cam_top (
                     activeArea_delayed[i] <= 1'b0;
                     rddata_delayed[i] <= 16'd0;
                     gray_value_delayed[i] <= 8'd0;
+                    gray_blur_delayed[i] <= 8'd0;
+                    gaussian_ready_delayed[i] <= 1'b0;
                     adaptive_flag_delayed[i] <= 1'b0;
                     rddata_bg_delayed[i] <= 8'd0;
                     bg_load_active_delayed[i] <= 1'b0;
@@ -303,6 +312,8 @@ module test_digital_cam_top (
                 activeArea_delayed[0] <= activeArea_d2;
                 rddata_delayed[0] <= rddata;
                 gray_value_delayed[0] <= gray_value;
+                gray_blur_delayed[0] <= gray_blur;
+                gaussian_ready_delayed[0] <= filter_ready;
                 adaptive_flag_delayed[0] <= adaptive_fg_flag;
                 rddata_bg_delayed[0] <= rddata_bg;
                 bg_load_active_delayed[0] <= bg_load_active;
@@ -313,11 +324,13 @@ module test_digital_cam_top (
                     activeArea_delayed[i] <= activeArea_delayed[i-1];
                     rddata_delayed[i] <= rddata_delayed[i-1];
                     gray_value_delayed[i] <= gray_value_delayed[i-1];
+                    gray_blur_delayed[i] <= gray_blur_delayed[i-1];
+                    gaussian_ready_delayed[i] <= gaussian_ready_delayed[i-1];
                     adaptive_flag_delayed[i] <= adaptive_flag_delayed[i-1];
                     rddata_bg_delayed[i] <= rddata_bg_delayed[i-1];
                     bg_load_active_delayed[i] <= bg_load_active_delayed[i-1];
                 end
-    
+
             end
         end
 
@@ -333,6 +346,7 @@ module test_digital_cam_top (
     // assign resend = btn_rising_edge;
 
     assign vga_enable = vga_enable_reg;
+    assign pixel_valid = activeArea_delayed[PIPE_LATENCY];
 
     // 메모리 주소 할당
     assign wraddress_ram1 = wraddress[15:0];
@@ -375,7 +389,6 @@ module test_digital_cam_top (
     // 이미지 처리 모듈 인스턴스
     // ============================================================================
     // 1차 가우시안 블러 (640 픽셀 처리)
-    wire [7:0] gray_blur;
     gaussian_3x3_gray8 #(
         .IMG_WIDTH(640)
     ) gaussian_gray_inst (
@@ -452,6 +465,8 @@ module test_digital_cam_top (
     );
 
     assign bg_load_active = ~vga_enable_reg; // Automatically capture first frame
+    assign gaussian_value = gray_blur_delayed[PIPE_LATENCY];
+    assign gaussian_ready = gaussian_ready_delayed[PIPE_LATENCY];
 
     adaptive_background #(
         .ADDR_WIDTH(17),
@@ -487,6 +502,7 @@ module test_digital_cam_top (
     wire [7:0] sel_orig_g = activeArea_delayed[PIPE_LATENCY] ? sel_g_888 : 8'h00;
     wire [7:0] sel_orig_b = activeArea_delayed[PIPE_LATENCY] ? sel_b_888 : 8'h00;
     wire [7:0] sel_gray = activeArea_delayed[PIPE_LATENCY] ? gray_value_delayed[PIPE_LATENCY] : 8'h00;
+    wire [7:0] sel_gaussian = activeArea_delayed[PIPE_LATENCY] ? gray_blur_delayed[PIPE_LATENCY] : 8'h00;
     wire [7:0] sel_sobel = (activeArea_delayed[PIPE_LATENCY] && sobel_ready) ? sobel_value : 8'h00;
     wire [7:0] sel_canny = (activeArea_delayed[PIPE_LATENCY] && canny_ready) ? canny_value : 8'h00;
     
@@ -543,6 +559,11 @@ module test_digital_cam_top (
                 final_r = sel_canny;
                 final_g = sel_canny;
                 final_b = sel_canny;
+            end
+            MODE_GAUSS: begin
+                final_r = sel_gaussian;
+                final_g = sel_gaussian;
+                final_b = sel_gaussian;
             end
             MODE_COLOR: begin
                 final_r = sel_colortrack_r;
