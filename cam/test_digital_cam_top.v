@@ -27,6 +27,8 @@ module test_digital_cam_top (
     output wire        sobel_ready,        // 소벨 결과 유효 플래그
     output wire [7:0]  gaussian_value,     // 가우시안 필터 결과 (그레이스케일)
     output wire        gaussian_ready,     // 가우시안 결과 유효 플래그
+    output wire        color_track_mask,   // 색 추적 결과 플래그
+    output wire        color_track_ready,  // 색 추적 결과 유효 신호
     output wire [7:0]  canny_value,        // 캐니 필터 결과 (이진)
     output wire        canny_ready         // 캐니 결과 유효 플래그
 );
@@ -85,7 +87,6 @@ module test_digital_cam_top (
     wire hsv_valid;
     wire color_track_out;
     wire color_track_valid;
-    reg color_track_out_d1;
 
     // Reset signal for VGA domain (active low)
     wire rst_n_vga_domain = 1'b1;  // 항상 활성화 (리셋 해제)
@@ -97,7 +98,7 @@ module test_digital_cam_top (
     reg [7:0] gray_value_delayed [PIPE_LATENCY:0];      // 그레이스케일 지연
     reg [7:0] gray_blur_delayed [PIPE_LATENCY:0];       // 가우시안 필터 결과 지연
     reg gaussian_ready_delayed [PIPE_LATENCY:0];        // 가우시안 유효 신호 지연
-    reg [15:0] rddata_bg_delayed [PIPE_LATENCY:0];      // 배경 픽셀 데이터 지연
+    reg [7:0] rddata_bg_delayed [PIPE_LATENCY:0];       // 배경 픽셀 데이터 지연
     reg bg_load_active_delayed [PIPE_LATENCY:0];        // 배경 로드 신호 지연
     reg adaptive_flag_delayed [PIPE_LATENCY:0];
     wire  bg_load_active;
@@ -291,8 +292,6 @@ module test_digital_cam_top (
     // ============================================================================
     integer i;
         always @(posedge clk_25MHz) begin  // Delay for color tracker output to align with main pipeline
-            color_track_out_d1 <= color_track_out;
-    
             if (vsync_raw == 1'b0) begin
                 // 프레임 시작 시 모든 지연 레지스터 클리어
                 for (i = 0; i <= PIPE_LATENCY; i = i + 1) begin
@@ -330,7 +329,7 @@ module test_digital_cam_top (
                     rddata_bg_delayed[i] <= rddata_bg_delayed[i-1];
                     bg_load_active_delayed[i] <= bg_load_active_delayed[i-1];
                 end
-
+    
             end
         end
 
@@ -467,6 +466,9 @@ module test_digital_cam_top (
     assign bg_load_active = ~vga_enable_reg; // Automatically capture first frame
     assign gaussian_value = gray_blur_delayed[PIPE_LATENCY];
     assign gaussian_ready = gaussian_ready_delayed[PIPE_LATENCY];
+    assign color_track_mask = color_track_out;
+    assign color_track_ready = color_track_valid;
+    wire color_track_pixel = color_track_out && color_track_valid;
 
     adaptive_background #(
         .ADDR_WIDTH(17),
@@ -512,22 +514,22 @@ module test_digital_cam_top (
     always @(*) begin
         case (color_track_select)
             2'b00: begin // Red tracking
-                sel_colortrack_r = color_track_out_d1 ? 8'hFF : 8'h00;
+                sel_colortrack_r = color_track_pixel ? 8'hFF : 8'h00;
                 sel_colortrack_g = 8'h00;
                 sel_colortrack_b = 8'h00;
             end
             2'b01: begin // Green tracking
                 sel_colortrack_r = 8'h00;
-                sel_colortrack_g = color_track_out_d1 ? 8'hFF : 8'h00;
+                sel_colortrack_g = color_track_pixel ? 8'hFF : 8'h00;
                 sel_colortrack_b = 8'h00;
             end
             2'b10: begin // Blue tracking
                 sel_colortrack_r = 8'h00;
                 sel_colortrack_g = 8'h00;
-                sel_colortrack_b = color_track_out_d1 ? 8'hFF : 8'h00;
+                sel_colortrack_b = color_track_pixel ? 8'hFF : 8'h00;
             end
             default: begin
-                sel_colortrack_r = color_track_out_d1 ? 8'hFF : 8'h00;
+                sel_colortrack_r = color_track_pixel ? 8'hFF : 8'h00;
                 sel_colortrack_g = 8'h00;
                 sel_colortrack_b = 8'h00;
             end

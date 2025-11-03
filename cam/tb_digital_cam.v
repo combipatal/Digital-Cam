@@ -15,12 +15,14 @@ reg [15:0] frame_mem [0:320*240-1]; // 320x240 프레임 메모리
 wire [7:0] sobel_value;
 wire [7:0] gaussian_value;
 wire [7:0] canny_value;
+wire color_track_mask;
+wire color_track_ready;
 
 wire sobel_ready;
 wire gaussian_ready;
 wire canny_ready;
 
-localparam [2:0] MODE_GAUSS = 3'd6;
+localparam [2:0] MODE_COLOR = 3'd4;
 
 test_digital_cam_top test_digital_cam_top_inst (
     .clk_50MHz(clk_50MHz),
@@ -35,19 +37,21 @@ test_digital_cam_top test_digital_cam_top_inst (
     .sobel_ready(sobel_ready),
     .gaussian_value(gaussian_value),
     .gaussian_ready(gaussian_ready),
+    .color_track_mask(color_track_mask),
+    .color_track_ready(color_track_ready),
     .canny_value(canny_value),
     .canny_ready(canny_ready)
 );
 
 
 initial begin   //초기화
-    $readmemh("C:/git/Verilog-HDL/cam/out_rgb565.hex", frame_mem);
+    $readmemh("C:/git/Verilog-HDL/cam/out_color_tracker.hex", frame_mem);
     clk_50MHz = 0;  
     clk_25MHz = 0;
     wren = 0;
     wraddress = 0;
     wrdata = 0;
-    active_filter_mode = MODE_GAUSS; // Gaussian 필터 모드
+    active_filter_mode = MODE_COLOR; // Color tracking (Red) 모드
 end
 
 always #10 clk_50MHz = ~clk_50MHz;  // 50MHz 클럭 생성
@@ -70,11 +74,12 @@ localparam integer IMG_HEIGHT = 480;
 localparam integer IDX_MAX    = IMG_WIDTH * IMG_HEIGHT; // 전체 VGA 프레임(640x480) dump
 integer px_fd; // 필터 결과 파일 디스크립터
 integer px_cnt = 0; // 픽셀 값 카운트
+reg [15:0] px_value;
 
 initial begin
-    px_fd = $fopen( "C:/git/Verilog-HDL/cam/px_value_gaussian.hex", "w");
+    px_fd = $fopen( "C:/git/Verilog-HDL/cam/px_mask_color.hex", "w");
     if (px_fd == 0) begin
-        $display("Failed to open px_value.hex file");
+        $display("Failed to open px_mask_color.hex file");
     end
     px_cnt = 0;
 end
@@ -83,10 +88,11 @@ end
 
 always @(posedge clk_25MHz) begin
     if (pixel_valid && px_cnt < IDX_MAX) begin
-        $fwrite(px_fd, "%02h\n", gaussian_value); // 픽셀 값 쓰기
+        px_value = (color_track_ready && (color_track_mask === 1'b1)) ? 16'hF800 : 16'h0000;
+        $fwrite(px_fd, "%04h\n", px_value); // RGB565: 빨간색 혹은 검정
         px_cnt <= px_cnt + 1; // 픽셀 값 카운트 증가
         if (px_cnt == IDX_MAX - 1) begin
-            $display("Pixel dump completed (Gaussian)");
+            $display("Pixel dump completed (Color Tracking)");
             $fclose(px_fd);
             $finish;
         end
