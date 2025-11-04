@@ -30,7 +30,10 @@ module test_digital_cam_top (
     output wire        color_track_mask,   // 색 추적 결과 플래그
     output wire        color_track_ready,  // 색 추적 결과 유효 신호
     output wire [7:0]  canny_value,        // 캐니 필터 결과 (이진)
-    output wire        canny_ready         // 캐니 결과 유효 플래그
+    output wire        canny_ready,        // 캐니 결과 유효 플래그
+    output wire        adaptive_fg_mask,   // 배경제거 전경 마스크 (파이프라인 정렬)
+    output wire [15:0] pixel_rgb565,       // 파이프라인 정렬된 원본 RGB565
+    output wire        vsync               // VGA vsync 노출
 );
 
     // ============================================================================
@@ -462,13 +465,16 @@ module test_digital_cam_top (
         .valid_out(color_track_valid),
         .is_target_out(color_track_out)
     );
-
+    wire [15:0] sel_rddata_orig = rddata_delayed[PIPE_LATENCY];
     assign bg_load_active = ~vga_enable_reg; // Automatically capture first frame
     assign gaussian_value = gray_blur_delayed[PIPE_LATENCY];
     assign gaussian_ready = gaussian_ready_delayed[PIPE_LATENCY];
     assign color_track_mask = color_track_out;
     assign color_track_ready = color_track_valid;
     wire color_track_pixel = color_track_out && color_track_valid;
+    assign adaptive_fg_mask = adaptive_flag_delayed[2]; // MODE_BG_SUB에서 사용하는 타이밍과 동일
+    assign pixel_rgb565 = activeArea_delayed[PIPE_LATENCY] ? sel_rddata_orig : 16'd0;
+    assign vsync = vsync_raw;
 
     adaptive_background #(
         .ADDR_WIDTH(17),
@@ -495,7 +501,7 @@ module test_digital_cam_top (
     // 출력 선택 및 VGA 연결
     // ============================================================================
     // 최종 출력 선택
-    wire [15:0] sel_rddata_orig = rddata_delayed[PIPE_LATENCY];
+
     wire [7:0] sel_r_888 = {sel_rddata_orig[15:11], 3'b111};
     wire [7:0] sel_g_888 = {sel_rddata_orig[10:5],  2'b11};
     wire [7:0] sel_b_888 = {sel_rddata_orig[4:0],   3'b111};

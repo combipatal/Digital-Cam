@@ -92,7 +92,7 @@ module vga_640 (
     
     // HACK: 시스템의 다른 부분에 존재하는 알 수 없는 -1 오프셋으로 인해 발생하는
     // 화면 깨짐 현상을 보정하기 위해 주소에 1을 더함. 이는 증상을 해결하기 위한 임시방편.
-    wire [16:0] addr_next = line_base + {8'b0, src_x}; // + 17'd1;
+    wire [16:0] addr_next = line_base + {8'b0, src_x} + 17'd1;
     
     always @(posedge CLK25) begin
         activeArea <= video_active;
