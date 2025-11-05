@@ -16,7 +16,7 @@ module vga_640 (
     output wire        clkout,         // 비디오 DAC(ADV7123)으로 전달되는 픽셀 클럭
     output reg         Hsync,          // 수평 동기화 신호 (active-low)
     output reg         Vsync,          // 수직 동기화 신호 (active-low)
-    output wire        Nblank,         // 블랭킹 신호 (active-high, 유효 영상 구간에서 1)
+   // output wire        Nblank,         // 블랭킹 신호 (active-high, 유효 영상 구간에서 1)
     output reg         activeArea,     // 유효 영상 구간(640x480) 표시 신호
     output reg [16:0]  pixel_address   // 프레임 버퍼에서 읽어올 픽셀 주소 (320x240 기준)
 );

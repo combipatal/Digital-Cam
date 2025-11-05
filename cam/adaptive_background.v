@@ -22,7 +22,7 @@ module adaptive_background #(
 ) (
     // --- 시스템 신호 ---
     input  wire                     clk,            // 시스템 클럭
-    input  wire                     rst,            // 리셋
+    input  wire                     rst_n,            // 리셋 (active low)
     input  wire                     enable,         // 모듈 활성화
 
     // --- 입력 데이터 스트림 ---
@@ -86,12 +86,12 @@ module adaptive_background #(
     wire foreground_p1 = (abs_diff_p1 > threshold_p1); // 전경 판단
 
     // --- p2 로직: 학습률에 따른 델타(보정값) 계산 ---
-    wire signed [8:0] bg_delta_p2 = diff_p2 >>> SHIFT_LG2; // 배경 학습률
-    wire signed [8:0] fg_delta_p2 = diff_p2 >>> FG_SHIFT_LG2; // 전경 학습률
-    wire signed [8:0] final_delta_p2 = foreground_p2 ? fg_delta_p2 : bg_delta_p2;
+    wire signed [8:0] bg_delta_p2 = diff_p2 >>> SHIFT_LG2; // 배경 학습률 , 보정치를 계산
+    wire signed [8:0] fg_delta_p2 = diff_p2 >>> FG_SHIFT_LG2; // 전경 학습률, 보정치를 계산
+    wire signed [8:0] final_delta_p2 = foreground_p2 ? fg_delta_p2 : bg_delta_p2; // 전경 판단에 따라 보정치를 선택
 
     // --- p3 로직: 새로운 배경 픽셀 값 계산 ---
-    wire signed [8:0] new_bg_ext = {1'b0, bg_pixel_p2} + final_delta_p2;
+    wire signed [8:0] new_bg_ext = {1'b0, bg_pixel_p2} + final_delta_p2; // 새로운 배경 픽셀 값 계산
     wire [PIXEL_WIDTH-1:0] new_bg_pixel_p2;
     
     // Saturation logic
@@ -102,7 +102,7 @@ module adaptive_background #(
     // 파이프라인 레지스터 단계
     // ============================================================================
     always @(posedge clk) begin
-        if (rst) begin
+        if (!rst_n) begin
             // 리셋 로직 (필요 시 추가)
         end else if (enable) begin
             // --- Stage 1: 입력 래칭 ---

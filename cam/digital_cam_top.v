@@ -10,7 +10,7 @@ module digital_cam_top (
     output wire [7:0]  vga_r,          // VGA 빨간색 (8비트)
     output wire [7:0]  vga_g,          // VGA 초록색 (8비트)
     output wire [7:0]  vga_b,          // VGA 파란색 (8비트)
-    output wire        vga_blank_N,    // VGA 블랭킹 신호
+    output wire        vga_blank_N,    // VGA 블랭킹 신호 (activearea 신호로 대체)
     output wire        vga_sync_N,     // VGA 동기화 신호
     output wire        vga_CLK,        // VGA 클럭
     
@@ -64,7 +64,7 @@ module digital_cam_top (
     // VGA 신호
     // ============================================================================
     wire hsync_raw, vsync_raw;
-    wire vga_blank_N_raw;
+    //wire vga_blank_N_raw;
     wire vga_sync_N_raw;
     wire vga_enable;         // VGA 출력 활성화 신호
     // VGA 즉시 출력 신호를 2클럭 지연시키기 위한 레지스터들 (파이프라인 기준 d2)
@@ -465,7 +465,7 @@ module digital_cam_top (
         .FG_SHIFT_LG2(8)
     ) adaptive_bg_inst (
         .clk(clk_25_vga),
-        .rst(1'b0),
+        .rst_n(rst_n_vga_domain),
         .enable(1'b1),
         .addr_in(rdaddress_delayed[GAUSS_LAT]),
         .live_pixel_in(gray_blur), // Connect 8-bit grayscale directly
@@ -598,7 +598,7 @@ module digital_cam_top (
         .clkout(vga_CLK),
         .Hsync(hsync_raw),
         .Vsync(vsync_raw),
-        .Nblank(vga_blank_N_raw), 
+        //.Nblank(vga_blank_N_raw),     // activearea 신호로 대체
         .activeArea(activeArea), 
         .pixel_address(rdaddress)
     );
@@ -606,7 +606,7 @@ module digital_cam_top (
     // VGA 출력 신호들
     assign vga_hsync = hsync_raw;
     assign vga_vsync = vsync_raw;
-    assign vga_blank_N = vga_blank_N_raw;
+    assign vga_blank_N = activeArea_delayed[PIPE_LATENCY];
     assign vga_sync_N = 1'b1;
 
     // OV7670 카메라 컨트롤러
