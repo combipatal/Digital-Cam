@@ -1,0 +1,68 @@
+소벨 필터 RTL 구현 (`sobel_3x3_gray8.v`)
+---------------------------------------
+1. 스트림 인터페이스  
+   - 입력 포트는 `pixel_in`(8비트 그레이), `active_area`, `vsync`, `enable`이며, `pixel_addr`는 과거 호환성을 위해 유지하되 내부에서는 사용하지 않는다.  
+   - 출력은 엣지 강도 대신 0/255의 이진 결과를 내보내는 `pixel_out`과 
+   유효 플래그 `sobel_ready`로 구성되어 상위 단계가 `activeArea_delayed`와 AND하여 VGA 파이프라인에 정렬한다(`digital_cam_top.v:495`).
+
+2. 좌표 및 경계 관리  
+   - `x_coord`, `y_coord` 레지스터가 `active_area` 엣지를 감시하며 라스터 좌표를 추적한다. `vsync` 하강 엣지를 `frame_start`로 사용하고,
+    `active_area` 상승/하강을 라인 경계로 삼아 X/Y를 재설정한다.  
+   - 좌표는 이후 경계 클램핑 로직에서 사용되어 상단·좌측 2픽셀에 대해 `border_pixel` 신호를 만들고, 초기화 단계에서 강제 0 출력으로 맞춘다.
+
+3. 3×3 윈도우 생성  
+   - 두 개의 라인 버퍼 배열 `lb0`, `lb1`이 프레임 폭(예: 640)만큼의 깊이를 갖고, `wr_sel` 토글을 통해 홀수/짝수 라인을 번갈아 저장한다.  
+   - 수평 시프트 레지스터 `top_sr*`, `mid_sr*`, `cur_sr*`가 각각 y-2, y-1, y 라인의 최근 세 픽셀을 보관한다.  
+   - `window_valid`는 `enable && active_area` 조건과 행/열 카운터가 2 이상 누적됐을 때만 1이 되어 뒤의 연산 스테이지가 불필요한 연산을 하지 않도록 한다.
+
+4. 파이프라인 구성 (`PIPE_LAT=5`)  
+   - Stage0: 3×3 윈도우를 경계 클램핑을 거쳐 `g00`~`g22`로 정렬하고, `window_valid`와 `border_pixel` 신호를 동시에 만들며 파이프라인 유효 비트 `vpipe`에 주입한다.  
+   - Stage1: `gx_pos/gx_neg`, `gy_pos/gy_neg`의 차이를 이용해 `gx_abs`, `gy_abs`를 계산한다. 
+                부호 연산 없이 절댓값만 사용하여 DSP 블록을 절약했다(`sobel_3x3_gray8.v:235-270`).  
+   - Stage2: `mag <= |Gx| + |Gy|`를 통해 맨해튼 노름을 계산하고, 임계값 비교 시 상위 비트로 포화 여부를 확인해서 255로 클램핑한다(`sobel_3x3_gray8.v:277-299`).  
+   - Stage3~4: `vpipe`를 이용해 윈도우가 유효한 마지막 클럭에만 `pixel_out`을 갱신하며, 경계 픽셀은 강제로 0으로 출력한다.
+
+5. 상위 모듈 연계  
+   - `digital_cam_top.v`는 가우시안 블러 출력(`gray_blur`)을 Sobel 입력으로 주고, IR 리모컨 상/하 버튼으로 조절되는 
+   `sobel_threshold_btn` 값을 바로 전달한다(`digital_cam_top.v:204-241, 400-412`).  
+   - 최종 VGA MUX 단계에서는 `activeArea_delayed[PIPE_LATENCY] && sobel_ready` 조건을 통해 파이프라인 정렬을 보장하고 
+        RGB888로 복제한 뒤 회색조 이미지로 출력한다.
+
+
+캐니 필터 RTL 구현 (`canny_3x3_gray8.v`)
+---------------------------------------
+1. 인터페이스 및 타이밍  
+   - 입력은 Sobel과 동일한 스트리밍 구조지만 `enable`에 `filter_ready`를 사용해 가우시안 필터 내부 지연이 끝난 이후부터만 캐니가 활성화되도록 했다(`digital_cam_top.v:398-430`).  
+   - 출력은 8비트 바이너리 이미지(`pixel_out`)와 동기 플래그(`canny_ready`)이며, 상위 단계에서 `sel_canny`를 만들 때 동일한 파이프라인 깊이(7클럭)를 가정한다.
+
+2. Stage0 — 원본 픽셀 윈도우  
+   - `line1[]`, `line2[]` 듀얼 버퍼와 `cur_*`, `l1_*`, `l2_*` 시프트 레지스터가 3×3 윈도우를 만든다. `window_ready`는 최소 2행/2열이 채워졌을 때만 1이 되며, 초기 경계 처리는 `border_flag`로 분리된다.  
+   - `frame_reset`, `line_start`, `line_end` 신호가 `vsync`, `active_area` 엣지를 토대로 생성된다(`canny_3x3_gray8.v:28-111`).
+
+3. Stage1 — Sobel 그래디언트 계산  
+   - `p00`~`p22`를 구성한 뒤 Sobel 커널을 적용해서 `gx_signed_next`, `gy_signed_next`, `mag_sum_next`를 얻고, 방향을 4방향으로 양자화한 `dir_next`를 만든다(`canny_3x3_gray8.v:190-232`).  
+   - 레지스터 `mag_sum_s1`, `dir_raw_s1`와 좌표/유효 플래그(`col_s1`, `row_s1`, `window_valid_s1` 등)가 함께 파이프라인을 통과한다.
+
+4. Stage2 — 포화 및 경계 제로잉  
+   - 12비트 `mag_sum_s1`를 상위 비트를 검사하여 8비트로 포화시키고(`mag_s2`), 경계 픽셀은 0으로 강제한다.  
+   - 방향 정보 `dir_s2`는 이후 NMS 단계에서 사용할 수 있도록 그대로 전달된다.
+
+5. Stage3 — 그래디언트 윈도우 재구성  
+   - `mag_line1`, `mag_line2`, `dir_line1`, `dir_line2` 버퍼가 그래디언트 크기/방향 데이터를 위한 또 다른 3×3 윈도우를 만든다.  
+   - 수평 시프트 레지스터 `mag_cur*`, `mag_l1_*`, `mag_l2_*`와 `dir_mid*`가 NMS에서 사용할 `m00`~`m22`, `dir_center` 값을 준비한다.
+
+6. Stage4 — NMS + 이중 임계 + 히스테리시스  
+   - `dir_center`에 맞춰 비교할 이웃을 선택하고, `nms_keep`으로 로컬 최대가 아닌 픽셀을 제거한다(`canny_3x3_gray8.v:414-435`).  
+   - `threshold_high` 이상의 값은 strong edge, `threshold_low` 이상은 weak edge로 분류하고, 주변 8픽셀 중 strong edge가 있는지 `neigh_strong`으로 검사한다.  
+   - 최종적으로 strong edge 또는 strong과 연결된 weak edge만 0xFF로 출력하며 나머지는 0으로 만든다. 출력 유효성은 `final_valid`가 담당한다(`canny_3x3_gray8.v:437-471`).
+
+7. 상위 모듈 파라미터링  
+   - `digital_cam_top.v`는 `canny_thr_low`, `canny_thr_high` 레지스터를 유지해 모드 전환 시에도 값이 보존되고, 향후 IR 버튼 매핑을 통해 동적 조정이 가능하도록 설계되어 있다(`digital_cam_top.v:207-427`).  
+   - VGA 출력 경로에서 `activeArea_delayed[PIPE_LATENCY] && canny_ready` 조건을 사용해 정확한 타이밍으로 RGB 세 채널에 같은 값을 복사해 흑백 엣지 맵을 표시한다(`digital_cam_top.v:496, 548-550`).
+
+
+테스트 및 후속 처리
+------------------
+- 테스트벤치 `tb_digital_cam.v`는 Canny 모드(`MODE_CANNY = 3'd3`)에서 `canny_ready`가 1인 픽셀을 `px_value_canny.hex`로 캡처하고, Sobel 전용 벤치는 `tb_digital_cam_sobel.v`가 동일한 방식으로 `sobel_ready`를 감시한다.  
+- 두 필터 모두 상위 모듈의 `PIPE_LATENCY=7`에 맞춰 정렬되므로, 추가 모듈을 연결할 때는 동일한 지연을 지키거나 `activeArea_delayed[]`에 새로운 탭을 추가해야 한다.  
+- IR 리모컨 입력(`ir_up_pulse`, `ir_down_pulse`)은 Sobel 임계값을 실시간 조정해 하드웨어 디버깅 시 노이즈 상황에 맞춰 튜닝할 수 있도록 한다.

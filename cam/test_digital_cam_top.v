@@ -483,7 +483,7 @@ module test_digital_cam_top (
         .FG_SHIFT_LG2(8)
     ) adaptive_bg_inst (
         .clk(clk_25MHz),
-        .rst(1'b0),
+        .rst_n(1'b1),
         .enable(1'b1),
         .addr_in(rdaddress_delayed[GAUSS_LAT]),
         .live_pixel_in(gray_blur), // Connect 8-bit grayscale directly
@@ -618,7 +618,7 @@ module test_digital_cam_top (
         .clkout(),         // 테스트 환경에서는 VGA 클럭 신호 사용 안 함
         .Hsync(),          // 테스트 환경에서는 Hsync 신호 사용 안 함
         .Vsync(vsync_raw), //output
-        .Nblank(),         // 테스트 환경에서는 Nblank 신호 사용 안 함
+        //.Nblank(),         // 테스트 환경에서는 Nblank 신호 사용 안 함
         .activeArea(activeArea), 
         .pixel_address(rdaddress)
     );
