@@ -1,0 +1,18 @@
+
+State Machine - |digital_cam_top|active_filter_mode
+Name active_filter_mode.MODE_BG_SUB active_filter_mode.MODE_COLOR active_filter_mode.MODE_CANNY active_filter_mode.MODE_SOBEL active_filter_mode.MODE_GRAY active_filter_mode.MODE_ORIG 
+active_filter_mode.MODE_ORIG 0 0 0 0 0 0 
+active_filter_mode.MODE_GRAY 0 0 0 0 1 1 
+active_filter_mode.MODE_SOBEL 0 0 0 1 0 1 
+active_filter_mode.MODE_CANNY 0 0 1 0 0 1 
+active_filter_mode.MODE_COLOR 0 1 0 0 0 1 
+active_filter_mode.MODE_BG_SUB 1 0 0 0 0 1 
+
+State Machine - |digital_cam_top|IR_RECEVER:ir_inst|state
+Name state.PROCESS_DATA state.DATA_SPACE state.DATA_MARK state.LEAD_SPACE state.LEAD_MARK state.IDLE 
+state.IDLE 0 0 0 0 0 0 
+state.LEAD_MARK 0 0 0 0 1 1 
+state.LEAD_SPACE 0 0 0 1 0 1 
+state.DATA_MARK 0 0 1 0 0 1 
+state.DATA_SPACE 0 1 0 0 0 1 
+state.PROCESS_DATA 1 0 0 0 0 1 

@@ -1,0 +1,3 @@
+Warning (10268): Verilog HDL information at ov7670_capture.v(65): always construct contains both blocking and non-blocking assignments File: C:/altera/project/cam/ov7670_capture.v Line: 65
+Info (10281): Verilog HDL Declaration information at ov7670_capture.v(7): object "SRC_H" differs only in case from object "src_h" in the same scope File: C:/altera/project/cam/ov7670_capture.v Line: 7
+Info (10281): Verilog HDL Declaration information at ov7670_capture.v(8): object "SRC_V" differs only in case from object "src_v" in the same scope File: C:/altera/project/cam/ov7670_capture.v Line: 8
