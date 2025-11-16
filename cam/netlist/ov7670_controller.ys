@@ -1,3 +1,0 @@
-read_verilog -sv -formal -overwrite {workspace}/ov7670_controller.v
-design -reset-vlog; proc;
-write_json {workspace}/netlist/ov7670_controller.json

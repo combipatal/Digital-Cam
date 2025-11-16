@@ -1,3 +1,0 @@
-read_verilog -sv -formal -overwrite {workspace}/gaussian_3x3_gray8.v
-design -reset-vlog; proc;
-write_json {workspace}/netlist/gaussian_3x3_gray8.json
