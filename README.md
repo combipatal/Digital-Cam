@@ -81,4 +81,4 @@ bash -lc "python3 hex2img16.py px_background.hex 640 480 out_background.png"
 ## 참고 및 향후 작업
 - 하드웨어 실험 시 OV7670 라인 타이밍과 VGA 동기화를 반드시 오실로스코프로 확인하세요.
 - 새로운 필터를 추가할 경우 해당 경로의 파이프라인 지연을 `PIPE_LATENCY`에 맞춰 보정해야 합니다.
-- 시뮬레이션 덤프 파일은 `.gitignore`에 추가하여 대용량 추적을 피하는 것을 권장합니다.
+
